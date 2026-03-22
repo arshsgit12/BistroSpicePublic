@@ -1,659 +1,382 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-// ─── CONFIG ────────────────────────────────────────────────────────────────
-const GOOGLE_CLIENT_ID =
-  "1031994809087-ribigpmso5umf5bt4f1eofdj4vor2rk4.apps.googleusercontent.com";
-
+const GOOGLE_CLIENT_ID = "1031994809087-ribigpmso5umf5bt4f1eofdj4vor2rk4.apps.googleusercontent.com";
 const ADMIN_EMAILS = ["thestdychannelonly@gmail.com", "pythonwitharsh@gmail.com"];
 
-// ─── MENU DATA ─────────────────────────────────────────────────────────────
 const MENU = [
-  {
-    id: 1,
-    category: "Starters",
-    name: "Paneer Tikka",
-    price: 220,
-    emoji: "🧀",
-    desc: "Marinated cottage cheese, tandoor-grilled",
-  },
-  {
-    id: 2,
-    category: "Starters",
-    name: "Veg Spring Rolls",
-    price: 160,
-    emoji: "🥢",
-    desc: "Crispy rolls with mixed veggies",
-  },
-  {
-    id: 3,
-    category: "Starters",
-    name: "Chicken Wings",
-    price: 280,
-    emoji: "🍗",
-    desc: "Spiced, smoky, served with dip",
-  },
-  {
-    id: 4,
-    category: "Mains",
-    name: "Dal Makhani",
-    price: 240,
-    emoji: "🍲",
-    desc: "Slow-cooked black lentils, butter & cream",
-  },
-  {
-    id: 5,
-    category: "Mains",
-    name: "Butter Chicken",
-    price: 320,
-    emoji: "🍛",
-    desc: "Classic tomato-cream curry",
-  },
-  {
-    id: 6,
-    category: "Mains",
-    name: "Paneer Butter Masala",
-    price: 290,
-    emoji: "🫕",
-    desc: "Cottage cheese in rich gravy",
-  },
-  {
-    id: 7,
-    category: "Mains",
-    name: "Chicken Biryani",
-    price: 360,
-    emoji: "🍚",
-    desc: "Fragrant basmati, slow-dum cooked",
-  },
-  {
-    id: 8,
-    category: "Breads",
-    name: "Butter Naan",
-    price: 50,
-    emoji: "🫓",
-    desc: "Soft tandoor-baked bread",
-  },
-  {
-    id: 9,
-    category: "Breads",
-    name: "Garlic Roti",
-    price: 45,
-    emoji: "🥙",
-    desc: "Whole wheat, garlic butter",
-  },
-  {
-    id: 10,
-    category: "Breads",
-    name: "Paratha",
-    price: 60,
-    emoji: "🥞",
-    desc: "Layered, flaky whole wheat",
-  },
-  {
-    id: 11,
-    category: "Drinks",
-    name: "Mango Lassi",
-    price: 90,
-    emoji: "🥭",
-    desc: "Thick, sweet, chilled",
-  },
-  {
-    id: 12,
-    category: "Drinks",
-    name: "Masala Chai",
-    price: 40,
-    emoji: "☕",
-    desc: "Spiced milk tea",
-  },
-  {
-    id: 13,
-    category: "Drinks",
-    name: "Fresh Lime Soda",
-    price: 70,
-    emoji: "🍋",
-    desc: "Sweet or salted, your choice",
-  },
-  {
-    id: 14,
-    category: "Desserts",
-    name: "Gulab Jamun",
-    price: 80,
-    emoji: "🟤",
-    desc: "Warm, syrup-soaked dumplings",
-  },
-  {
-    id: 15,
-    category: "Desserts",
-    name: "Kulfi",
-    price: 100,
-    emoji: "🍦",
-    desc: "Traditional Indian ice cream",
-  },
+  { id:1,  category:"Starters",  name:"Paneer Tikka",         price:220, emoji:"🧀", desc:"Marinated cottage cheese, tandoor-grilled" },
+  { id:2,  category:"Starters",  name:"Veg Spring Rolls",     price:160, emoji:"🥢", desc:"Crispy rolls with mixed veggies" },
+  { id:3,  category:"Starters",  name:"Chicken Wings",        price:280, emoji:"🍗", desc:"Spiced, smoky, served with dip" },
+  { id:4,  category:"Mains",     name:"Dal Makhani",          price:240, emoji:"🍲", desc:"Slow-cooked black lentils, butter & cream" },
+  { id:5,  category:"Mains",     name:"Butter Chicken",       price:320, emoji:"🍛", desc:"Classic tomato-cream curry" },
+  { id:6,  category:"Mains",     name:"Paneer Butter Masala", price:290, emoji:"🫕", desc:"Cottage cheese in rich gravy" },
+  { id:7,  category:"Mains",     name:"Chicken Biryani",      price:360, emoji:"🍚", desc:"Fragrant basmati, slow-dum cooked" },
+  { id:8,  category:"Breads",    name:"Butter Naan",          price:50,  emoji:"🫓", desc:"Soft tandoor-baked bread" },
+  { id:9,  category:"Breads",    name:"Garlic Roti",          price:45,  emoji:"🥙", desc:"Whole wheat, garlic butter" },
+  { id:10, category:"Breads",    name:"Paratha",              price:60,  emoji:"🥞", desc:"Layered, flaky whole wheat" },
+  { id:11, category:"Drinks",    name:"Mango Lassi",          price:90,  emoji:"🥭", desc:"Thick, sweet, chilled" },
+  { id:12, category:"Drinks",    name:"Masala Chai",          price:40,  emoji:"☕", desc:"Spiced milk tea" },
+  { id:13, category:"Drinks",    name:"Fresh Lime Soda",      price:70,  emoji:"🍋", desc:"Sweet or salted, your choice" },
+  { id:14, category:"Desserts",  name:"Gulab Jamun",          price:80,  emoji:"🟤", desc:"Warm, syrup-soaked dumplings" },
+  { id:15, category:"Desserts",  name:"Kulfi",                price:100, emoji:"🍦", desc:"Traditional Indian ice cream" },
 ];
 
-const CATEGORIES = ["All", ...Array.from(new Set(MENU.map((i) => i.category)))];
+const CATEGORIES  = ["All", ...Array.from(new Set(MENU.map(i => i.category)))];
 const STATUS_FLOW = ["Received", "Preparing", "Ready"];
-const STATUS_ICON = { Received: "📋", Preparing: "👨‍🍳", Ready: "✅" };
-const TABLES = Array.from({ length: 10 }, (_, i) => i + 1);
+const STATUS_COLOR = { Received:"#C9A96E", Preparing:"#7EB8F7", Ready:"#7ECFA0" };
+const TABLES = Array.from({ length:10 }, (_, i) => i + 1);
+function genId() { return "ORD-" + Math.random().toString(36).slice(2,6).toUpperCase(); }
 
-const STORAGE_KEYS = {
-  session: "bistrospice-session",
-  orders: "bistrospice-orders",
-  profiles: "bistrospice-user-profiles",
-};
+// ── In-memory store shared between customer and admin ──
+let _orders = [];
+let _listeners = [];
+function saveOrders(o) { _orders=[...o]; _listeners.forEach(fn=>fn([..._orders])); }
+function subscribeOrders(fn) { _listeners.push(fn); return ()=>{ _listeners=_listeners.filter(l=>l!==fn); }; }
 
-function genOrderId() {
-  return "ORD-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+// Format timestamp → "12 Jul 2025, 02:34 PM"
+function fmtDateTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleString("en-IN", {
+    day:"2-digit", month:"short", year:"numeric",
+    hour:"2-digit", minute:"2-digit", hour12:true
+  }).replace(",", " ·");
+}
+// Format just time → "02:34 PM"
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true });
 }
 
-function readStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStorage(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function getCustomerKey(user) {
-  if (!user) return null;
-  if (user.email) return user.email.toLowerCase();
-  return `guest-table-${user.table ?? "walkin"}`;
-}
-
-function createUserProfile(user) {
-  return {
-    userKey: getCustomerKey(user),
-    name: user.name || "Guest",
-    email: user.email || null,
-    picture: user.picture || null,
-    lastTable: user.table || null,
-    totalOrders: 0,
-    totalSpent: 0,
-    lastOrderAt: null,
-    favoriteCategories: [],
-    favoriteItems: [],
-    recentOrders: [],
-  };
-}
-
-function updateProfileWithOrder(existingProfile, user, order) {
-  const profile = existingProfile || createUserProfile(user);
-  const itemMap = new Map(profile.favoriteItems.map((item) => [item.id, item]));
-  const categoryMap = new Map(
-    profile.favoriteCategories.map((category) => [category.name, category])
-  );
-
-  order.items.forEach((item) => {
-    const menuItem = MENU.find((menuEntry) => menuEntry.id === item.id);
-    const existingItem = itemMap.get(item.id) || {
-      id: item.id,
-      name: item.name,
-      qty: 0,
-      orderCount: 0,
-      category: menuItem?.category || "Other",
-    };
-
-    itemMap.set(item.id, {
-      ...existingItem,
-      qty: existingItem.qty + item.qty,
-      orderCount: existingItem.orderCount + 1,
-    });
-
-    const categoryName = menuItem?.category || "Other";
-    const existingCategory = categoryMap.get(categoryName) || {
-      name: categoryName,
-      qty: 0,
-      orderCount: 0,
-    };
-
-    categoryMap.set(categoryName, {
-      ...existingCategory,
-      qty: existingCategory.qty + item.qty,
-      orderCount: existingCategory.orderCount + 1,
-    });
-  });
-
-  return {
-    ...profile,
-    name: user.name || profile.name,
-    email: user.email || profile.email,
-    picture: user.picture || profile.picture,
-    lastTable: order.table,
-    totalOrders: profile.totalOrders + 1,
-    totalSpent: profile.totalSpent + order.total,
-    lastOrderAt: order.timestamp,
-    favoriteItems: [...itemMap.values()]
-      .sort((a, b) => b.qty - a.qty || b.orderCount - a.orderCount)
-      .slice(0, 5),
-    favoriteCategories: [...categoryMap.values()]
-      .sort((a, b) => b.qty - a.qty || b.orderCount - a.orderCount)
-      .slice(0, 4),
-    recentOrders: [
-      {
-        id: order.id,
-        total: order.total,
-        timestamp: order.timestamp,
-        table: order.table,
-        items: order.items,
-      },
-      ...profile.recentOrders,
-    ].slice(0, 6),
-  };
-}
-
-function getRecommendations(profile) {
-  if (!profile) return [];
-
-  const favoriteCategoryNames = profile.favoriteCategories.map((item) => item.name);
-  const favoriteItemIds = new Set(profile.favoriteItems.map((item) => item.id));
-
-  const recommendations = MENU.filter(
-    (item) =>
-      favoriteCategoryNames.includes(item.category) && !favoriteItemIds.has(item.id)
-  );
-
-  if (recommendations.length >= 3) {
-    return recommendations.slice(0, 3);
-  }
-
-  const fallbackFavorites = MENU.filter((item) => favoriteItemIds.has(item.id));
-  return [...fallbackFavorites, ...recommendations]
-    .filter(
-      (item, index, arr) => arr.findIndex((entry) => entry.id === item.id) === index
-    )
-    .slice(0, 3);
-}
-
-// ─── STYLES ────────────────────────────────────────────────────────────────
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #0f0e0c; --surface: #1a1916; --surface2: #252320; --border: #2e2c28;
-    --accent: #f5a623; --accent2: #e8834a; --text: #f0ede8; --text2: #9a958c;
-    --green: #22c55e; --blue: #3b82f6; --red: #ef4444; --r: 12px;
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --ink:#1a1714;--ink2:#4a453e;--ink3:#8a847a;
+    --paper:#faf8f4;--paper2:#f2ede5;--paper3:#e8e0d4;
+    --gold:#C9A96E;--gold2:#a07840;
+    --line:rgba(26,23,20,0.10);--line2:rgba(26,23,20,0.05);
+    --green:#2e8a5a;--green-bg:rgba(126,207,160,0.12);--green-border:rgba(126,207,160,0.5);
+    --r:6px;--r2:3px;
   }
-  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
-  button { cursor: pointer; font-family: inherit; }
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  html,body{background:var(--paper);color:var(--ink);}
+  body{font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+  button{cursor:pointer;font-family:inherit;}
+  ::-webkit-scrollbar{width:3px;}
+  ::-webkit-scrollbar-thumb{background:var(--paper3);border-radius:2px;}
 
   /* AUTH */
-  .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(245,166,35,.1) 0%, transparent 65%), var(--bg); }
-  .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px 32px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,.5); }
-  .auth-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 30px; color: var(--accent); letter-spacing: -1px; margin-bottom: 6px; }
-  .auth-logo span { color: var(--text); }
-  .auth-tagline { font-size: 14px; color: var(--text2); margin-bottom: 32px; line-height: 1.6; }
-  .guest-btn { width: 100%; padding: 14px; border-radius: var(--r); border: none; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0f0e0c; font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; transition: opacity .15s; margin-bottom: 10px; }
-  .guest-btn:hover { opacity: .88; }
-  .auth-hint { font-size: 12px; color: var(--text2); margin-bottom: 0; }
-  .auth-divider { display: flex; align-items: center; gap: 12px; margin: 24px 0; }
-  .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-  .auth-divider span { font-size: 12px; color: var(--text2); white-space: nowrap; font-weight: 500; }
-  .google-btn { width: 100%; padding: 13px 20px; border-radius: var(--r); border: 1.5px solid var(--border); background: var(--surface2); color: var(--text); font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all .2s; }
-  .google-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(245,166,35,.06); }
-  .google-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .auth-note { font-size: 12px; color: var(--text2); margin-top: 18px; line-height: 1.6; }
-  .error-box { margin-top: 12px; font-size: 13px; color: var(--red); background: rgba(239,68,68,.08); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(239,68,68,.2); }
+  .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--paper);background-image:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(201,169,110,0.12),transparent);}
+  .auth-card{width:100%;max-width:420px;background:#fff;border:1px solid var(--line);border-radius:var(--r2);padding:52px 48px 44px;position:relative;box-shadow:0 2px 4px rgba(26,23,20,0.04),0 12px 40px rgba(26,23,20,0.07);}
+  .auth-card::before{content:'';position:absolute;top:0;left:48px;right:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+  .auth-brand{text-align:center;margin-bottom:44px;}
+  .auth-brand-name{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;letter-spacing:0.08em;color:var(--ink);line-height:1;}
+  .auth-brand-name em{font-style:italic;color:var(--gold2);}
+  .auth-tagline{font-size:10px;letter-spacing:0.22em;color:var(--ink3);text-transform:uppercase;margin-top:10px;}
+  .auth-cta{width:100%;padding:14px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r2);font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;letter-spacing:0.12em;transition:background 0.2s,transform 0.1s;margin-bottom:10px;}
+  .auth-cta:hover{background:var(--ink2);}
+  .auth-cta:active{transform:scale(0.99);}
+  .auth-cta-sub{font-size:11px;color:var(--ink3);text-align:center;letter-spacing:0.04em;}
+  .auth-divider{display:flex;align-items:center;gap:16px;margin:28px 0;}
+  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--line);}
+  .auth-divider span{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;}
+  .google-btn{width:100%;padding:13px 20px;border:1px solid var(--line);background:var(--paper);color:var(--ink2);border-radius:var(--r2);font-size:14px;font-weight:400;letter-spacing:0.03em;display:flex;align-items:center;justify-content:center;gap:10px;transition:border-color 0.2s,background 0.2s;}
+  .google-btn:hover:not(:disabled){border-color:var(--gold);background:var(--paper2);}
+  .google-btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .auth-note{font-size:11px;color:var(--ink3);text-align:center;margin-top:20px;line-height:1.7;}
+  .auth-error{margin-top:12px;font-size:12px;color:#b04040;background:rgba(176,64,64,0.06);padding:10px 14px;border-radius:var(--r2);border:1px solid rgba(176,64,64,0.18);text-align:center;}
 
-  /* NOT-AUTH */
-  .notauth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px 32px; max-width: 420px; width: 100%; text-align: center; }
-  .admin-list { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 16px 0 24px; text-align: left; font-size: 13px; color: var(--text2); }
-  .admin-list-title { font-weight: 600; color: var(--text); margin-bottom: 6px; font-size: 13px; }
+  /* NOT AUTH */
+  .notauth-icon{font-size:36px;text-align:center;margin-bottom:20px;opacity:0.4;}
+  .notauth-title{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:400;text-align:center;margin-bottom:10px;}
+  .notauth-body{font-size:13px;color:var(--ink2);text-align:center;line-height:1.7;margin-bottom:20px;}
+  .notauth-list{background:var(--paper2);border:1px solid var(--line);border-radius:var(--r2);padding:14px 18px;margin-bottom:24px;}
+  .notauth-list-title{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;}
+  .notauth-email{font-family:monospace;font-size:12px;color:var(--ink2);padding:2px 0;}
+  .back-btn{width:100%;padding:12px;border:1px solid var(--line);background:transparent;color:var(--ink2);border-radius:var(--r2);font-size:12px;letter-spacing:0.08em;transition:all 0.18s;}
+  .back-btn:hover{border-color:var(--ink2);color:var(--ink);}
 
-  /* TOP NAV */
-  .top-nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; gap: 10px; }
-  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: var(--accent); letter-spacing: -.5px; flex-shrink: 0; }
-  .logo span { color: var(--text); }
-  .nav-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .role-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
-  .role-admin { background: rgba(245,166,35,.15); color: var(--accent); border: 1px solid rgba(245,166,35,.3); }
-  .role-user { background: rgba(59,130,246,.12); color: var(--blue); border: 1px solid rgba(59,130,246,.25); }
-  .user-chip { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); font-size: 13px; color: var(--text2); min-width: 0; max-width: 180px; }
-  .user-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
-  .user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sign-out-btn { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-size: 12px; font-weight: 600; transition: all .18s; white-space: nowrap; flex-shrink: 0; }
-  .sign-out-btn:hover { border-color: var(--red); color: var(--red); }
+  /* NAV */
+  .top-nav{background:#fff;border-bottom:1px solid var(--line);height:58px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;}
+  .nav-brand{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;letter-spacing:0.08em;color:var(--ink);flex-shrink:0;}
+  .nav-brand em{font-style:italic;color:var(--gold2);}
+  .nav-right{display:flex;align-items:center;gap:10px;min-width:0;}
+  .nav-role{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:4px 12px;border-radius:20px;border:1px solid;white-space:nowrap;flex-shrink:0;}
+  .nav-role.admin{border-color:rgba(201,169,110,0.5);color:var(--gold2);background:rgba(201,169,110,0.08);}
+  .nav-role.guest{border-color:var(--line);color:var(--ink3);}
+  .nav-user{display:flex;align-items:center;gap:8px;min-width:0;max-width:150px;}
+  .nav-avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;object-fit:cover;border:1px solid var(--line);}
+  .nav-avatar-init{width:28px;height:28px;border-radius:50%;flex-shrink:0;background:var(--paper2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--ink2);}
+  .nav-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--ink2);}
+  .nav-signout{padding:5px 14px;border:1px solid var(--line);background:transparent;color:var(--ink3);border-radius:var(--r2);font-size:11px;letter-spacing:0.08em;transition:all 0.18s;white-space:nowrap;flex-shrink:0;}
+  .nav-signout:hover{border-color:#b04040;color:#b04040;}
 
-  /* CUSTOMER */
-  .menu-page { max-width: 480px; margin: 0 auto; padding-bottom: 140px; }
-  .welcome-card, .profile-card, .recommend-card { margin: 16px 16px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
-  .welcome-card h2, .profile-card h3, .recommend-card h3 { font-family: 'Syne', sans-serif; margin-bottom: 6px; }
-  .subtle-text { color: var(--text2); font-size: 13px; line-height: 1.5; }
-  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-  .mini-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
-  .mini-stat strong { display: block; font-family: 'Syne', sans-serif; font-size: 18px; color: var(--accent); }
-  .mini-stat span { font-size: 11px; color: var(--text2); }
-  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .pref-chip { padding: 7px 12px; border-radius: 999px; background: rgba(245,166,35,.08); border: 1px solid rgba(245,166,35,.25); color: var(--accent); font-size: 12px; font-weight: 700; }
-  .recommend-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
-  .recommend-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; align-items: center; gap: 12px; }
-  .recommend-item .emoji { font-size: 26px; width: 36px; text-align: center; }
-  .recommend-item .meta { flex: 1; }
-  .recommend-item .meta strong { display: block; font-size: 14px; }
-  .recommend-item .meta span { color: var(--text2); font-size: 12px; }
-  .table-banner { margin: 16px 16px 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: var(--r); padding: 14px 18px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
-  .tnum { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: #0f0e0c; line-height: 1; }
-  .tlabel { font-size: 12px; color: rgba(0,0,0,.55); font-weight: 500; }
-  .table-select { padding: 12px 16px; margin: 12px 16px 0; background: var(--surface); border: 1.5px dashed var(--border); border-radius: var(--r); display: flex; align-items: center; gap: 10px; cursor: pointer; transition: border-color .2s; }
-  .table-select:hover { border-color: var(--accent); }
-  .cat-scroll { display: flex; gap: 8px; padding: 16px 16px 0; overflow-x: auto; scrollbar-width: none; }
-  .cat-scroll::-webkit-scrollbar { display: none; }
-  .cat-btn { white-space: nowrap; padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: transparent; color: var(--text2); font-size: 13px; font-weight: 500; transition: all .2s; flex-shrink: 0; }
-  .cat-btn.active { background: var(--accent); border-color: var(--accent); color: #0f0e0c; font-weight: 700; }
-  .menu-section { padding: 20px 16px 0; }
-  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: var(--text2); text-transform: uppercase; margin-bottom: 12px; }
-  .menu-grid { display: flex; flex-direction: column; gap: 8px; }
-  .menu-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; display: flex; gap: 12px; align-items: center; transition: border-color .2s; }
-  .menu-card:hover { border-color: rgba(245,166,35,.4); }
-  .menu-card.recommended { border-color: rgba(245,166,35,.55); box-shadow: inset 0 0 0 1px rgba(245,166,35,.15); }
-  .item-emoji { font-size: 32px; flex-shrink: 0; width: 44px; text-align: center; }
-  .item-info { flex: 1; min-width: 0; }
-  .item-name { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .item-desc { font-size: 12px; color: var(--text2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item-price { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--accent); margin-top: 4px; }
-  .item-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .qty-btn { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text); font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all .15s; }
-  .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .qty-num { font-weight: 700; font-size: 15px; min-width: 20px; text-align: center; }
-  .add-btn { padding: 6px 16px; border-radius: 20px; border: none; background: var(--accent); color: #0f0e0c; font-size: 13px; font-weight: 700; transition: opacity .15s; }
-  .add-btn:hover { opacity: .85; }
-  .recommend-badge { font-size: 10px; font-weight: 800; letter-spacing: .8px; background: rgba(245,166,35,.16); color: var(--accent); border: 1px solid rgba(245,166,35,.3); border-radius: 999px; padding: 4px 8px; }
-  .cart-footer { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); background: var(--surface); border-top: 1px solid var(--border); padding: 12px 16px 24px; width: 100%; max-width: 480px; z-index: 50; }
-  .cart-summary { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .cart-count { font-size: 13px; color: var(--text2); }
-  .cart-count span { color: var(--accent); font-weight: 700; }
-  .cart-total { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
-  .place-order-btn { width: 100%; padding: 14px; border-radius: var(--r); border: none; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0f0e0c; font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; transition: opacity .15s; }
-  .place-order-btn:hover { opacity: .9; }
+  /* CUSTOMER MENU */
+  .menu-page{max-width:520px;margin:0 auto;padding-bottom:150px;}
+  .table-hero{margin:20px 16px 0;background:var(--ink);border-radius:var(--r2);padding:20px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;overflow:hidden;position:relative;transition:background 0.2s;}
+  .table-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(201,169,110,0.18) 0%,transparent 60%);pointer-events:none;}
+  .table-hero:hover{background:var(--ink2);}
+  .table-hero-num{font-family:'Cormorant Garamond',serif;font-size:52px;font-weight:300;color:var(--gold);line-height:1;letter-spacing:-1px;}
+  .table-hero-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:3px;}
+  .table-hero-hint{font-size:12px;color:rgba(255,255,255,0.55);}
+  .table-hero-chevron{margin-left:auto;color:rgba(255,255,255,0.25);font-size:22px;}
+  .table-prompt{margin:20px 16px 0;padding:16px 20px;border:1px dashed var(--paper3);border-radius:var(--r2);cursor:pointer;display:flex;align-items:center;gap:12px;background:var(--paper2);transition:border-color 0.2s;}
+  .table-prompt:hover{border-color:var(--gold);}
+  .table-prompt-text{flex:1;font-size:13px;color:var(--ink3);}
+  .table-prompt-cta{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold2);font-weight:600;}
+  .cat-strip{display:flex;gap:6px;padding:20px 16px 0;overflow-x:auto;scrollbar-width:none;}
+  .cat-strip::-webkit-scrollbar{display:none;}
+  .cat-pill{white-space:nowrap;padding:6px 18px;border:1px solid var(--line);background:transparent;color:var(--ink3);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;flex-shrink:0;border-radius:20px;transition:all 0.2s;font-family:'Inter',sans-serif;}
+  .cat-pill.on{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+  .menu-group{padding:24px 16px 0;}
+  .menu-group-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);margin-bottom:14px;display:flex;align-items:center;gap:12px;}
+  .menu-group-label::after{content:'';flex:1;height:1px;background:var(--line2);}
+  .menu-list{display:flex;flex-direction:column;gap:2px;}
+  .menu-item{background:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;transition:background 0.15s;border-radius:var(--r);border:1px solid transparent;}
+  .menu-item:hover{background:var(--paper2);border-color:var(--line);}
+  .menu-item-emoji{font-size:28px;width:42px;text-align:center;flex-shrink:0;}
+  .menu-item-body{flex:1;min-width:0;}
+  .menu-item-name{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px;}
+  .menu-item-desc{font-size:12px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .menu-item-price{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:400;color:var(--gold2);margin-top:4px;}
+  .item-ctrl{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .item-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:18px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;line-height:1;}
+  .item-btn:hover{border-color:var(--ink);background:var(--ink);color:var(--paper);}
+  .item-qty{font-size:15px;font-weight:500;min-width:18px;text-align:center;color:var(--ink);}
+  .item-add{padding:7px 18px;border-radius:var(--r2);border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:11px;letter-spacing:0.08em;font-weight:500;transition:all 0.18s;text-transform:uppercase;}
+  .item-add:hover{border-color:var(--ink);background:var(--ink);color:var(--paper);}
+  .cart-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;padding:12px 16px 28px;background:#fff;border-top:1px solid var(--line);z-index:50;}
+  .cart-bar-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .cart-bar-count{font-size:12px;color:var(--ink3);}
+  .cart-bar-count strong{color:var(--ink);font-weight:600;}
+  .cart-total{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--ink);}
+  .cart-place{width:100%;padding:14px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r2);font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;letter-spacing:0.14em;transition:background 0.2s,transform 0.1s;}
+  .cart-place:hover{background:var(--ink2);}
+  .cart-place:active{transform:scale(0.99);}
 
-  /* CONFIRM */
-  .confirm-page { max-width: 480px; margin: 0 auto; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-  .confirm-icon { font-size: 72px; margin-bottom: 20px; animation: pop .4s cubic-bezier(.175,.885,.32,1.275); }
-  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .confirm-title { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-  .confirm-sub { color: var(--text2); margin-bottom: 32px; font-size: 15px; line-height: 1.5; }
-  .order-card { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align: left; margin-bottom: 20px; }
-  .order-id-big { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; color: var(--accent); margin-bottom: 4px; }
-  .order-meta { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
-  .order-items-list { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-  .order-item-row { display: flex; justify-content: space-between; font-size: 14px; }
-  .status-track-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text2); margin: 16px 0 10px; font-weight: 700; }
-  .status-track { display: flex; gap: 4px; }
-  .status-step { flex: 1; padding: 8px 4px; border-radius: 8px; text-align: center; font-size: 11px; font-weight: 600; transition: all .3s; }
-  .status-step.done { background: var(--surface2); color: var(--text2); }
-  .status-step.current { background: var(--accent); color: #0f0e0c; }
-  .status-step.pending { background: var(--surface); color: var(--text2); border: 1px dashed var(--border); }
-  .new-order-btn { padding: 12px 28px; border-radius: var(--r); border: 1.5px solid var(--border); background: transparent; color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; transition: all .2s; }
-  .new-order-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* CONFIRM / ORDER STATUS PAGE */
+  .confirm-page{max-width:520px;margin:0 auto;padding:52px 24px 40px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .confirm-seal{font-size:60px;margin-bottom:24px;animation:sealIn 0.5s cubic-bezier(0.34,1.56,0.64,1);}
+  @keyframes sealIn{from{transform:scale(0.3) rotate(-8deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
+  .confirm-title{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:300;letter-spacing:0.04em;margin-bottom:8px;}
+  .confirm-sub{font-size:13px;color:var(--ink3);margin-bottom:36px;line-height:1.7;letter-spacing:0.03em;}
+  .confirm-receipt{width:100%;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:28px;text-align:left;margin-bottom:24px;position:relative;}
+  .confirm-receipt::before{content:'';position:absolute;top:0;left:28px;right:28px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+  .receipt-id{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:300;color:var(--gold2);letter-spacing:0.06em;margin-bottom:4px;}
+  .receipt-meta{font-size:12px;color:var(--ink3);margin-bottom:4px;letter-spacing:0.04em;}
+  .receipt-datetime{font-size:11px;color:var(--ink3);margin-bottom:20px;letter-spacing:0.04em;opacity:0.7;}
+  .receipt-items{border-top:1px solid var(--line2);padding-top:16px;display:flex;flex-direction:column;gap:8px;}
+  .receipt-row{display:flex;justify-content:space-between;font-size:13px;}
+  .receipt-row .lbl{color:var(--ink2);}
+  .receipt-row .val{font-weight:500;color:var(--ink);}
+  .receipt-total{display:flex;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+  .receipt-total .lbl{color:var(--ink3);font-size:11px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;align-self:center;}
+  .receipt-total .val{font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--gold2);font-weight:400;}
 
-  /* ADMIN */
-  .admin-page { padding: 20px; max-width: 1000px; margin: 0 auto; }
-  .admin-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
-  .admin-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; }
-  .admin-stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; flex: 1; min-width: 80px; }
-  .stat-num { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; }
-  .stat-label { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .live-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--green); font-weight: 600; }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
-  .filter-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
-  .filter-tab { padding: 6px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: transparent; color: var(--text2); font-size: 13px; font-weight: 500; transition: all .2s; }
-  .filter-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(245,166,35,.08); }
-  .orders-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-  .order-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; position: relative; overflow: hidden; }
-  .order-tile::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-  .order-tile[data-status="Received"]::before { background: #f59e0b; }
-  .order-tile[data-status="Preparing"]::before { background: #3b82f6; }
-  .order-tile[data-status="Ready"]::before { background: #10b981; }
-  .tile-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
-  .tile-id { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: var(--accent); }
-  .tile-time { font-size: 11px; color: var(--text2); margin-top: 2px; }
-  .tile-user { font-size: 12px; color: var(--text2); margin-top: 6px; line-height: 1.4; }
-  .tile-table { font-size: 12px; background: var(--surface2); border-radius: 6px; padding: 4px 10px; font-weight: 600; }
-  .tile-items { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
-  .tile-item { display: flex; justify-content: space-between; font-size: 13px; }
-  .tile-item .n { color: var(--text2); }
-  .tile-item .q { font-weight: 700; }
-  .tile-total { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 12px; }
-  .tile-total span { color: var(--accent); }
-  .status-btns { display: flex; gap: 6px; }
-  .status-btn { flex: 1; padding: 7px 4px; border-radius: 8px; border: 1.5px solid transparent; font-size: 12px; font-weight: 700; transition: all .15s; background: var(--surface2); color: var(--text2); }
-  .status-btn.current[data-s="Received"] { background: #f59e0b; border-color: #f59e0b; color: #0f0e0c; }
-  .status-btn.current[data-s="Preparing"] { background: #3b82f6; border-color: #3b82f6; color: #fff; }
-  .status-btn.current[data-s="Ready"] { background: #10b981; border-color: #10b981; color: #fff; }
-  .status-btn:hover:not(.current) { border-color: var(--text2); color: var(--text); }
-  .empty-state { text-align: center; padding: 60px 20px; color: var(--text2); }
-  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .5; }
-  .clear-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text2); cursor: pointer; margin-top: 6px; transition: all .2s; }
-  .clear-btn:hover { border-color: var(--text); color: var(--text); }
+  /* LIVE STATUS TRACK */
+  .status-track-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);margin:20px 0 12px;font-weight:500;}
+  .status-track{display:flex;gap:3px;width:100%;}
+  .status-step{flex:1;padding:9px 4px;text-align:center;font-size:10px;letter-spacing:0.1em;font-weight:500;text-transform:uppercase;transition:all 0.35s;border:1px solid var(--line);border-radius:var(--r2);}
+  .status-step.done{background:var(--paper2);color:var(--ink3);border-color:transparent;}
+  .status-step.current{background:var(--ink);color:var(--paper);border-color:transparent;}
+  .status-step.pending{background:transparent;color:var(--ink3);}
 
-  /* MODAL */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; max-width: 360px; width: 100%; text-align: center; }
-  .modal h3 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 8px; }
-  .modal p { font-size: 14px; color: var(--text2); margin-bottom: 20px; line-height: 1.5; }
-  .qr-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
-  .qr-tile { aspect-ratio: 1; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
-  .qr-tile:hover { border-color: var(--accent); background: rgba(245,166,35,.08); }
-  .qr-tile .tnum { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: var(--accent); }
-  .qr-tile .tlabel { font-size: 10px; color: var(--text2); }
-  .modal-close { width: 100%; padding: 12px; border-radius: var(--r); border: 1.5px solid var(--border); background: transparent; color: var(--text2); font-size: 14px; font-weight: 600; transition: all .2s; }
-  .modal-close:hover { border-color: var(--text); color: var(--text); }
+  /* ORDER READY BANNER — shown to customer when admin marks Ready */
+  .ready-banner{margin-top:20px;width:100%;background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--r);padding:18px 20px;display:flex;align-items:center;gap:14px;animation:fadeUp 0.4s ease;}
+  .ready-banner-icon{font-size:28px;flex-shrink:0;}
+  .ready-banner-text{flex:1;}
+  .ready-banner-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:var(--green);margin-bottom:2px;}
+  .ready-banner-sub{font-size:12px;color:var(--ink3);line-height:1.5;}
+
+  .more-btn{padding:12px 36px;border-radius:var(--r2);border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;transition:all 0.2s;margin-top:8px;}
+  .more-btn:hover{border-color:var(--ink);color:var(--ink);}
+
+  /* TABLE MODAL */
+  .modal-bg{position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);}
+  .modal-box{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:36px;max-width:360px;width:100%;text-align:center;position:relative;animation:modalIn 0.28s cubic-bezier(0.175,0.885,0.32,1.1);}
+  @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(0.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .modal-box::before{content:'';position:absolute;top:0;left:36px;right:36px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+  .modal-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:400;margin-bottom:8px;}
+  .modal-sub{font-size:12px;color:var(--ink3);margin-bottom:24px;line-height:1.6;}
+  .table-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px;}
+  .table-chip{aspect-ratio:1;border:1px solid var(--line);border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.18s;background:var(--paper);}
+  .table-chip:hover{border-color:var(--gold);background:rgba(201,169,110,0.06);}
+  .table-chip .num{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--gold2);}
+  .table-chip .lbl{font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink3);}
+  .modal-cancel{width:100%;padding:11px;border:1px solid var(--line);background:transparent;color:var(--ink3);border-radius:var(--r2);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.2s;}
+  .modal-cancel:hover{border-color:var(--ink2);color:var(--ink2);}
 
   /* TOAST */
-  .toast { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #fff; padding: 9px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; z-index: 300; animation: toastIn .25s ease; pointer-events: none; white-space: nowrap; }
-  @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+  .toast{position:fixed;bottom:160px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 22px;border-radius:20px;font-size:11px;letter-spacing:0.1em;z-index:300;animation:toastIn 0.25s ease;pointer-events:none;white-space:nowrap;text-transform:uppercase;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(6px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
 
-  .fade-in { animation: fadeIn .3s ease; }
-  .slide-up { animation: slideUp .35s cubic-bezier(.175,.885,.32,1.1); }
-  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes slideUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+  /* ADMIN */
+  .admin-page{padding:28px 24px;max-width:1060px;margin:0 auto;}
+  .admin-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;gap:12px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid var(--line);}
+  .admin-heading{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:300;letter-spacing:0.02em;}
+  .admin-date{font-size:11px;color:var(--ink3);margin-top:6px;letter-spacing:0.08em;text-transform:uppercase;}
+  .live-pill{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#2e8a5a;font-weight:600;padding:5px 14px;border-radius:20px;border:1px solid var(--green-border);background:var(--green-bg);}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:#7ECFA0;animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .kpi-strip{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;}
+  .kpi-card{flex:1;min-width:90px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;}
+  .kpi-val{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:300;line-height:1;margin-bottom:6px;}
+  .kpi-label{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink3);}
+  .filter-row{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap;}
+  .filter-btn{padding:7px 18px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--ink3);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;transition:all 0.18s;}
+  .filter-btn.on{border-color:var(--ink);background:var(--ink);color:var(--paper);}
+  .orders-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(285px,1fr));}
 
-  @media (max-width: 480px) {
-    .admin-stats { gap: 8px; }
-    .stat-card { padding: 10px 12px; }
-    .stat-num { font-size: 20px; }
-    .user-chip { display: none; }
-    .stat-row { grid-template-columns: 1fr; }
+  /* ORDER TILE */
+  .order-tile{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:box-shadow 0.2s;}
+  .order-tile:hover{box-shadow:0 4px 18px rgba(26,23,20,0.08);}
+  .tile-accent{height:2px;}
+  .tile-body{padding:18px 20px;}
+  .tile-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
+  .tile-id{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:var(--gold2);letter-spacing:0.04em;}
+  .tile-meta{font-size:11px;color:var(--ink3);margin-top:3px;letter-spacing:0.02em;}
+  .tile-datetime{font-size:10px;color:var(--ink3);opacity:0.7;margin-top:1px;letter-spacing:0.02em;}
+  .tile-table-badge{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r2);padding:3px 10px;color:var(--ink2);font-weight:600;white-space:nowrap;align-self:flex-start;}
+  .tile-items{margin-bottom:14px;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:10px 0;display:flex;flex-direction:column;gap:5px;}
+  .tile-item{display:flex;justify-content:space-between;font-size:12px;}
+  .tile-item .n{color:var(--ink2);}
+  .tile-item .q{font-weight:600;color:var(--ink);font-size:11px;}
+  .tile-footer{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .tile-total{font-size:12px;color:var(--ink3);}
+  .tile-total strong{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:400;color:var(--gold2);}
+
+  /* STATUS BUTTONS IN ADMIN TILE */
+  .status-btns{display:flex;gap:4px;}
+  .status-btn{flex:1;padding:8px 4px;text-align:center;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;border:1px solid var(--line);border-radius:var(--r2);background:transparent;color:var(--ink3);transition:all 0.15s;}
+  .status-btn:hover:not(.active){border-color:var(--ink3);color:var(--ink2);}
+  .status-btn.active-Received{background:rgba(201,169,110,0.12);border-color:rgba(201,169,110,0.5);color:#a07840;}
+  .status-btn.active-Preparing{background:rgba(126,184,247,0.12);border-color:rgba(126,184,247,0.5);color:#3b6fb0;}
+  .status-btn.active-Ready{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+
+  /* MARK READY BIG BUTTON */
+  .mark-ready-btn{width:100%;margin-top:10px;padding:11px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r2);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s,transform 0.1s;}
+  .mark-ready-btn:hover{background:var(--green);}
+  .mark-ready-btn:active{transform:scale(0.99);}
+  .mark-ready-btn.is-ready{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);cursor:default;}
+  .checkmark{font-size:14px;}
+
+  .empty-admin{text-align:center;padding:80px 20px;}
+  .empty-admin-icon{font-size:38px;opacity:0.15;margin-bottom:20px;}
+  .empty-admin-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--ink2);margin-bottom:8px;}
+  .empty-admin-text{font-size:13px;color:var(--ink3);letter-spacing:0.04em;line-height:1.6;}
+  .clear-btn{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;padding:4px 12px;border-radius:var(--r2);border:1px solid var(--line);background:transparent;color:var(--ink3);cursor:pointer;margin-top:6px;transition:all 0.2s;}
+  .clear-btn:hover{border-color:var(--ink2);color:var(--ink2);}
+
+  /* ANIMATIONS */
+  .fade-up{animation:fadeUp 0.32s ease;}
+  .pop-in{animation:popIn 0.38s cubic-bezier(0.175,0.885,0.32,1.1);}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes popIn{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+
+  @media(max-width:480px){
+    .auth-card{padding:40px 28px 36px;}
+    .kpi-strip{gap:8px;}
+    .kpi-card{padding:14px;}
+    .kpi-val{font-size:26px;}
+    .orders-grid{grid-template-columns:1fr;}
+    .nav-user{display:none;}
   }
 `;
 
-// ─── GOOGLE GIS HOOK ────────────────────────────────────────────────────────
+// ── Google Sign-In ──
 function useGIS() {
   const [ready, setReady] = useState(!!window.google?.accounts);
-
   useEffect(() => {
     if (window.google?.accounts) return;
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.onload = () => setReady(true);
+    s.async = true; s.onload = () => setReady(true);
     document.head.appendChild(s);
   }, []);
-
   const signIn = useCallback((onSuccess, onError) => {
-    if (!window.google?.accounts?.id) {
-      onError("Google Sign-In SDK not loaded.");
-      return;
-    }
-
+    if (!window.google?.accounts?.id) { onError("Google Sign-In SDK not loaded."); return; }
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: (resp) => {
-        try {
-          const p = JSON.parse(atob(resp.credential.split(".")[1]));
-          onSuccess({ name: p.name, email: p.email, picture: p.picture });
-        } catch {
-          onError("Could not parse sign-in response.");
-        }
+        try { const p = JSON.parse(atob(resp.credential.split(".")[1])); onSuccess({ name:p.name, email:p.email, picture:p.picture }); }
+        catch { onError("Could not parse response."); }
       },
       ux_mode: "popup",
     });
-
     window.google.accounts.id.prompt((n) => {
       if (n.isNotDisplayed() || n.isSkippedMoment()) {
-        const el = document.getElementById("g-btn-container");
-        if (el) {
-          el.innerHTML = "";
-          window.google.accounts.id.renderButton(el, {
-            theme: "filled_black",
-            size: "large",
-            text: "continue_with",
-            shape: "rectangular",
-            width: 320,
-          });
-        }
+        const el = document.getElementById("g-btn-slot");
+        if (el) { el.innerHTML = ""; window.google.accounts.id.renderButton(el, { theme:"filled_black", size:"large", width:320 }); }
       }
     });
   }, []);
-
   return { ready, signIn };
 }
 
-// ─── AUTH SCREEN ────────────────────────────────────────────────────────────
+// ── Auth Screen ──
 function AuthScreen({ onGuest, onGoogle }) {
   const { ready, signIn } = useGIS();
   const [error, setError] = useState("");
-
-  const handleGoogle = () => {
-    setError("");
-    signIn(
-      (user) => onGoogle(user),
-      (msg) => setError(msg)
-    );
-  };
-
+  const go = () => { setError(""); signIn(onGoogle, setError); };
   return (
-    <div className="auth-screen">
-      <div className="auth-card fade-in">
-        <div className="auth-logo">
-          Bistro<span>Spice</span>
+    <div className="auth-wrap">
+      <div className="auth-card fade-up">
+        <div className="auth-brand">
+          <div className="auth-brand-name">Bistro<em>Spice</em></div>
+          <div className="auth-tagline">Fine Dining · Table Ordering</div>
         </div>
-        <p className="auth-tagline">
-          Fast table ordering for dine-in restaurants.
-          <br />
-          Customers and staff can both sign in with Google.
-        </p>
-
-        <button className="guest-btn" onClick={onGuest}>
-          🍽 Continue as Walk-in Guest
-        </button>
-        <p className="auth-hint">Quick order without saving preferences.</p>
-
-        <div className="auth-divider">
-          <span>Customers & Restaurant Staff</span>
-        </div>
-
-        <div
-          id="g-btn-container"
-          style={{ display: "flex", justifyContent: "center", marginBottom: 8, minHeight: 44 }}
-        />
-
-        <button className="google-btn" onClick={handleGoogle} disabled={!ready}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              fill="#4285F4"
-              d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"
-            />
-            <path
-              fill="#34A853"
-              d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"
-            />
-            <path
-              fill="#EA4335"
-              d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"
-            />
+        <button className="auth-cta" onClick={onGuest}>Browse Menu &amp; Order</button>
+        <p className="auth-cta-sub">Customers — no sign-in required</p>
+        <div className="auth-divider"><span>Restaurant Staff</span></div>
+        <div id="g-btn-slot" style={{display:"flex",justifyContent:"center",minHeight:44,marginBottom:8}} />
+        <button className="google-btn" onClick={go} disabled={!ready}>
+          <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+            <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+            <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+            <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
+            <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
           </svg>
           {ready ? "Sign in with Google" : "Loading…"}
         </button>
-
-        {error && <div className="error-box">⚠️ {error}</div>}
-
-        <p className="auth-note">
-          Admins are recognised automatically by email.
-          <br />
-          Customer sign-ins save order history and preferences for future recommendations.
-        </p>
+        {error && <div className="auth-error">{error}</div>}
+        <p className="auth-note">Staff access requires an authorised Google account.<br />Contact your restaurant manager for access.</p>
       </div>
     </div>
   );
 }
 
-// ─── NOT AUTHORISED ─────────────────────────────────────────────────────────
-function NotAuthorisedScreen({ user, onContinueAsCustomer, onSignOut }) {
+// ── Not Authorised Screen ──
+function NotAuthorisedScreen({ user, onSignOut }) {
   return (
-    <div className="auth-screen">
-      <div className="notauth-card fade-in">
-        <div style={{ fontSize: 48, marginBottom: 16 }}>👤</div>
-        <div
-          style={{
-            fontFamily: "Syne,sans-serif",
-            fontWeight: 800,
-            fontSize: 22,
-            marginBottom: 8,
-          }}
-        >
-          Signed in as Customer
+    <div className="auth-wrap">
+      <div className="auth-card fade-up">
+        <div className="notauth-icon">🔒</div>
+        <div className="notauth-title">Access Denied</div>
+        <p className="notauth-body"><strong>{user.email}</strong> is not authorised.<br/>Ask the restaurant owner to add your email.</p>
+        <div className="notauth-list">
+          <div className="notauth-list-title">Authorised accounts</div>
+          {ADMIN_EMAILS.map(e=><div key={e} className="notauth-email">— {e}</div>)}
         </div>
-        <p style={{ color: "var(--text2)", fontSize: 14, lineHeight: 1.6 }}>
-          <strong style={{ color: "var(--text)" }}>{user.email}</strong> is not an admin
-          account, so it will be used as a customer profile instead.
-        </p>
-        <div className="admin-list">
-          <div className="admin-list-title">Admin emails</div>
-          {ADMIN_EMAILS.map((e) => (
-            <div key={e} style={{ fontFamily: "monospace", fontSize: 12, marginTop: 3 }}>
-              • {e}
-            </div>
-          ))}
-        </div>
-        <button
-          className="guest-btn"
-          style={{ marginBottom: 10 }}
-          onClick={onContinueAsCustomer}
-        >
-          Continue as Customer
-        </button>
-        <button
-          className="sign-out-btn"
-          style={{ width: "100%", padding: 12, fontSize: 14 }}
-          onClick={onSignOut}
-        >
-          Sign Out & Try Another Account
-        </button>
+        <button className="back-btn" onClick={onSignOut}>← Try a different account</button>
       </div>
     </div>
   );
 }
 
-// ─── TABLE MODAL ────────────────────────────────────────────────────────────
+// ── Table Selector Modal ──
 function TableModal({ onSelect, onClose }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal fade-in" onClick={(e) => e.stopPropagation()}>
-        <h3>🪑 Select Your Table</h3>
-        <p>Tap your table number. In production, scanning the QR code can set this automatically.</p>
-        <div className="qr-grid">
-          {TABLES.map((t) => (
-            <div key={t} className="qr-tile" onClick={() => onSelect(t)}>
-              <span className="tnum">{t}</span>
-              <span className="tlabel">Table</span>
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal-box" onClick={e=>e.stopPropagation()}>
+        <div className="modal-title">Select Table</div>
+        <p className="modal-sub">Tap your table number to begin. In production, scanning the QR code at your table sets this automatically.</p>
+        <div className="table-grid">
+          {TABLES.map(t=>(
+            <div key={t} className="table-chip" onClick={()=>onSelect(t)}>
+              <span className="num">{t}</span>
+              <span className="lbl">Table</span>
             </div>
           ))}
         </div>
-        <button className="modal-close" onClick={onClose}>
-          Cancel
-        </button>
+        <button className="modal-cancel" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
@@ -664,299 +387,169 @@ function Toast({ msg }) {
   return <div className="toast">{msg}</div>;
 }
 
-// ─── CUSTOMER VIEW ──────────────────────────────────────────────────────────
-function CustomerView({ auth, orders, profile, recommendations, onPlaceOrder }) {
-  const [table, setTable] = useState(profile?.lastTable || null);
-  const [showTableModal, setShowTable] = useState(false);
-  const [cart, setCart] = useState({});
-  const [category, setCategory] = useState("All");
+// ── Customer View ──
+function CustomerView({ orders, onPlaceOrder }) {
+  const [table, setTable]         = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [cart, setCart]           = useState({});
+  const [cat, setCat]             = useState("All");
   const [confirmed, setConfirmed] = useState(null);
-  const [toast, setToast] = useState("");
+  const [toast, setToast]         = useState("");
 
-  useEffect(() => {
-    if (!table && profile?.lastTable) {
-      setTable(profile.lastTable);
-    }
-  }, [profile?.lastTable, table]);
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
-  };
+  const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2000); };
 
   const cartItems = Object.entries(cart)
-    .map(([id, qty]) => ({ ...MENU.find((m) => m.id === +id), qty }))
+    .map(([id,qty])=>({ ...MENU.find(m=>m.id===+id), qty }))
     .filter(Boolean);
-
-  const total = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const totalQty = cartItems.reduce((s, i) => s + i.qty, 0);
-  const recommendationIds = new Set(recommendations.map((item) => item.id));
+  const total    = cartItems.reduce((s,i)=>s+i.price*i.qty, 0);
+  const totalQty = cartItems.reduce((s,i)=>s+i.qty, 0);
 
   const updateCart = (id, delta) =>
-    setCart((prev) => {
-      const next = { ...prev };
-      const nextValue = (next[id] || 0) + delta;
-      if (nextValue <= 0) delete next[id];
-      else next[id] = nextValue;
-      return next;
+    setCart(prev => {
+      const n={...prev}, nv=(n[id]||0)+delta;
+      if(nv<=0) delete n[id]; else n[id]=nv;
+      return n;
     });
 
-  const filtered = MENU.filter((i) => category === "All" || i.category === category);
-  const grouped = CATEGORIES.slice(1)
-    .map((cat) => ({ cat, items: filtered.filter((i) => i.category === cat) }))
-    .filter((g) => g.items.length);
+  const filtered = MENU.filter(i=>cat==="All"||i.category===cat);
+  const grouped  = CATEGORIES.slice(1)
+    .map(c=>({ c, items:filtered.filter(i=>i.category===c) }))
+    .filter(g=>g.items.length);
 
   const handlePlace = () => {
-    if (!table) {
-      setShowTable(true);
-      return;
-    }
+    if (!table) { setShowModal(true); return; }
     if (!cartItems.length) return;
-
     const order = {
-      id: genOrderId(),
+      id: genId(),
       table,
       status: "Received",
       timestamp: Date.now(),
       total,
-      customerKey: getCustomerKey({ ...auth, table }),
-      customerName: auth?.name || "Guest",
-      customerEmail: auth?.email || null,
-      items: cartItems.map((i) => ({
-        id: i.id,
-        name: i.name,
-        qty: i.qty,
-        price: i.price,
-      })),
+      items: cartItems.map(i=>({ id:i.id, name:i.name, qty:i.qty, price:i.price })),
     };
-
-    onPlaceOrder(order, table);
+    onPlaceOrder(order);
     setConfirmed(order);
     setCart({});
   };
 
-  const liveStatus = confirmed
-    ? orders.find((o) => o.id === confirmed.id)?.status || confirmed.status
-    : "Received";
-  const statusIdx = STATUS_FLOW.indexOf(liveStatus);
+  // Always pull the latest status from the shared store
+  const liveOrder  = confirmed ? (orders.find(o=>o.id===confirmed.id) || confirmed) : null;
+  const liveStatus = liveOrder?.status || "Received";
+  const statusIdx  = STATUS_FLOW.indexOf(liveStatus);
+  const isReady    = liveStatus === "Ready";
 
+  // CONFIRMATION / LIVE STATUS PAGE
   if (confirmed) {
     return (
       <div className="menu-page">
-        <div className="confirm-page slide-up">
-          <div className="confirm-icon">🎉</div>
-          <h2 className="confirm-title">Order Placed!</h2>
+        <div className="confirm-page pop-in">
+          {/* Icon changes when order is ready */}
+          <div className="confirm-seal">{isReady ? "✅" : "🎉"}</div>
+
+          <h2 className="confirm-title">
+            {isReady ? "Order Ready!" : "Order Placed"}
+          </h2>
           <p className="confirm-sub">
-            Your order is with the kitchen.
-            <br />
-            Your preferences are now saved for better recommendations next time.
+            {isReady
+              ? "Your order is ready. Please collect from the counter."
+              : "Your order has been sent to the kitchen.\nWe'll have it ready shortly."}
           </p>
-          <div className="order-card">
-            <div className="order-id-big">{confirmed.id}</div>
-            <div className="order-meta">
-              Table {confirmed.table} · {confirmed.items.length} item
-              {confirmed.items.length !== 1 ? "s" : ""}
-            </div>
-            <div className="order-items-list">
-              {confirmed.items.map((i) => (
-                <div key={i.id} className="order-item-row">
-                  <span style={{ color: "var(--text2)" }}>{i.name}</span>
-                  <span style={{ fontWeight: 600 }}>
-                    ×{i.qty} &nbsp; ₹{i.price * i.qty}
-                  </span>
+
+          <div className="confirm-receipt">
+            <div className="receipt-id">{confirmed.id}</div>
+            <div className="receipt-meta">Table {confirmed.table} &nbsp;·&nbsp; {confirmed.items.length} item{confirmed.items.length!==1?"s":""}</div>
+            <div className="receipt-datetime">Placed at {fmtDateTime(confirmed.timestamp)}</div>
+            <div className="receipt-items">
+              {confirmed.items.map(i=>(
+                <div key={i.id} className="receipt-row">
+                  <span className="lbl">{i.name}</span>
+                  <span className="val">×{i.qty} &nbsp; ₹{i.price*i.qty}</span>
                 </div>
               ))}
-              <div
-                className="order-item-row"
-                style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}
-              >
-                <span style={{ fontWeight: 700 }}>Total</span>
-                <span style={{ fontWeight: 700, color: "var(--accent)" }}>₹{confirmed.total}</span>
-              </div>
             </div>
-            <div className="status-track-label">Live Order Status</div>
+            <div className="receipt-total">
+              <span className="lbl">Total</span>
+              <span className="val">₹{confirmed.total}</span>
+            </div>
+
+            <div className="status-track-label">Live Status</div>
             <div className="status-track">
-              {STATUS_FLOW.map((s, i) => (
-                <div
-                  key={s}
-                  className={`status-step ${i < statusIdx ? "done" : i === statusIdx ? "current" : "pending"}`}
-                >
-                  {STATUS_ICON[s]}
-                  <br />
-                  {s}
-                </div>
+              {STATUS_FLOW.map((s,i)=>(
+                <div key={s} className={`status-step ${i<statusIdx?"done":i===statusIdx?"current":"pending"}`}>{s}</div>
               ))}
             </div>
           </div>
-          <button
-            className="new-order-btn"
-            onClick={() => {
-              setConfirmed(null);
-            }}
-          >
-            + Order More Items
+
+          {/* "Order Fetched" banner — only shown when admin marks Ready */}
+          {isReady && (
+            <div className="ready-banner">
+              <div className="ready-banner-icon">✅</div>
+              <div className="ready-banner-text">
+                <div className="ready-banner-title">Order Fetched!</div>
+                <div className="ready-banner-sub">The kitchen has marked your order as ready.<br/>Please collect from the counter.</div>
+              </div>
+            </div>
+          )}
+
+          <button className="more-btn" onClick={()=>{ setConfirmed(null); setTable(null); }}>
+            Place Another Order
           </button>
         </div>
-        <Toast msg={toast} />
+        <Toast msg={toast}/>
       </div>
     );
   }
 
+  // MENU PAGE
   return (
     <>
-      <div className="menu-page fade-in">
-        <div className="welcome-card">
-          <h2>{auth?.email ? `Welcome back, ${auth.name}` : "Welcome to BistroSpice"}</h2>
-          <p className="subtle-text">
-            {auth?.email
-              ? "Your sign-in keeps your order history and food preferences saved for future recommendations."
-              : "Walk-in guest mode lets you order quickly, but recommendations are not saved after sign out."}
-          </p>
-        </div>
-
-        {profile && (
-          <div className="profile-card">
-            <h3>Your food profile</h3>
-            <p className="subtle-text">
-              Based on your previous orders, BistroSpice remembers what you like.
-            </p>
-
-            <div className="stat-row">
-              <div className="mini-stat">
-                <strong>{profile.totalOrders}</strong>
-                <span>Total orders</span>
-              </div>
-              <div className="mini-stat">
-                <strong>₹{profile.totalSpent}</strong>
-                <span>Total spent</span>
-              </div>
-              <div className="mini-stat">
-                <strong>{profile.lastTable || "-"}</strong>
-                <span>Last table</span>
-              </div>
-            </div>
-
-            {profile.favoriteCategories.length > 0 && (
-              <div className="chip-row">
-                {profile.favoriteCategories.map((item) => (
-                  <div key={item.name} className="pref-chip">
-                    {item.name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {recommendations.length > 0 && (
-          <div className="recommend-card">
-            <h3>Recommended for you</h3>
-            <p className="subtle-text">
-              Suggestions based on your saved preferences and past orders.
-            </p>
-            <div className="recommend-grid">
-              {recommendations.map((item) => (
-                <div key={item.id} className="recommend-item">
-                  <div className="emoji">{item.emoji}</div>
-                  <div className="meta">
-                    <strong>{item.name}</strong>
-                    <span>
-                      {item.category} · ₹{item.price}
-                    </span>
-                  </div>
-                  <button
-                    className="add-btn"
-                    onClick={() => {
-                      updateCart(item.id, 1);
-                      showToast(`${item.name} added`);
-                    }}
-                  >
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+      <div className="menu-page fade-up">
         {table ? (
-          <div className="table-banner" onClick={() => setShowTable(true)}>
+          <div className="table-hero" onClick={()=>setShowModal(true)}>
             <div>
-              <div className="tnum">{table}</div>
-              <div className="tlabel">TABLE NUMBER</div>
+              <div className="table-hero-label">Your Table</div>
+              <div className="table-hero-num">{table}</div>
+              <div className="table-hero-hint">Tap to change</div>
             </div>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontSize: 12, color: "rgba(0,0,0,.55)" }}>Tap to change →</span>
+            <div className="table-hero-chevron">›</div>
           </div>
         ) : (
-          <div className="table-select" onClick={() => setShowTable(true)}>
-            <span style={{ fontSize: 20 }}>🪑</span>
-            <span style={{ flex: 1, color: "var(--text2)" }}>Select your table number</span>
-            <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13 }}>SELECT →</span>
+          <div className="table-prompt" onClick={()=>setShowModal(true)}>
+            <span style={{fontSize:20}}>🪑</span>
+            <span className="table-prompt-text">Select your table number</span>
+            <span className="table-prompt-cta">Select →</span>
           </div>
         )}
 
-        <div className="cat-scroll">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              className={`cat-btn ${category === c ? "active" : ""}`}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </button>
+        <div className="cat-strip">
+          {CATEGORIES.map(c=>(
+            <button key={c} className={`cat-pill ${cat===c?"on":""}`} onClick={()=>setCat(c)}>{c}</button>
           ))}
         </div>
 
-        {grouped.map(({ cat, items }) => (
-          <div key={cat} className="menu-section">
-            <div className="section-label">{cat}</div>
-            <div className="menu-grid">
-              {items.map((item) => {
-                const qty = cart[item.id] || 0;
-                const isRecommended = recommendationIds.has(item.id);
-
+        {grouped.map(({c,items})=>(
+          <div key={c} className="menu-group">
+            <div className="menu-group-label">{c}</div>
+            <div className="menu-list">
+              {items.map(item=>{
+                const qty = cart[item.id]||0;
                 return (
-                  <div
-                    key={item.id}
-                    className={`menu-card ${isRecommended ? "recommended" : ""}`}
-                  >
-                    <div className="item-emoji">{item.emoji}</div>
-                    <div className="item-info">
-                      <div className="item-name">
-                        {item.name}
-                        {isRecommended && <span className="recommend-badge">FOR YOU</span>}
-                      </div>
-                      <div className="item-desc">{item.desc}</div>
-                      <div className="item-price">₹{item.price}</div>
+                  <div key={item.id} className="menu-item">
+                    <div className="menu-item-emoji">{item.emoji}</div>
+                    <div className="menu-item-body">
+                      <div className="menu-item-name">{item.name}</div>
+                      <div className="menu-item-desc">{item.desc}</div>
+                      <div className="menu-item-price">₹{item.price}</div>
                     </div>
-                    <div className="item-actions">
-                      {qty > 0 ? (
+                    <div className="item-ctrl">
+                      {qty>0 ? (
                         <>
-                          <button className="qty-btn" onClick={() => updateCart(item.id, -1)}>
-                            −
-                          </button>
-                          <span className="qty-num">{qty}</span>
-                          <button
-                            className="qty-btn"
-                            onClick={() => {
-                              updateCart(item.id, 1);
-                              showToast(`${item.name} added`);
-                            }}
-                          >
-                            +
-                          </button>
+                          <button className="item-btn" onClick={()=>updateCart(item.id,-1)}>−</button>
+                          <span className="item-qty">{qty}</span>
+                          <button className="item-btn" onClick={()=>{ updateCart(item.id,1); showToast(`${item.name} added`); }}>+</button>
                         </>
                       ) : (
-                        <button
-                          className="add-btn"
-                          onClick={() => {
-                            updateCart(item.id, 1);
-                            showToast(`${item.name} added`);
-                          }}
-                        >
-                          Add
-                        </button>
+                        <button className="item-add" onClick={()=>{ updateCart(item.id,1); showToast(`${item.name} added`); }}>Add</button>
                       )}
                     </div>
                   </div>
@@ -967,326 +560,227 @@ function CustomerView({ auth, orders, profile, recommendations, onPlaceOrder }) 
         ))}
       </div>
 
-      {totalQty > 0 && (
-        <div className="cart-footer">
-          <div className="cart-summary">
-            <span className="cart-count">
-              <span>{totalQty}</span> item{totalQty !== 1 ? "s" : ""} in cart
-            </span>
+      {totalQty>0 && (
+        <div className="cart-bar">
+          <div className="cart-bar-row">
+            <span className="cart-bar-count"><strong>{totalQty}</strong> item{totalQty!==1?"s":""} selected</span>
             <span className="cart-total">₹{total}</span>
           </div>
-          <button className="place-order-btn" onClick={handlePlace}>
-            Place Order{table ? ` · Table ${table}` : ""}
+          <button className="cart-place" onClick={handlePlace}>
+            Place Order{table?` · Table ${table}`:""}
           </button>
         </div>
       )}
 
-      {showTableModal && (
-        <TableModal
-          onSelect={(t) => {
-            setTable(t);
-            setShowTable(false);
-          }}
-          onClose={() => setShowTable(false)}
-        />
-      )}
-      <Toast msg={toast} />
+      {showModal && <TableModal onSelect={t=>{ setTable(t); setShowModal(false); }} onClose={()=>setShowModal(false)}/>}
+      <Toast msg={toast}/>
     </>
   );
 }
 
-// ─── ADMIN VIEW ─────────────────────────────────────────────────────────────
+// ── Admin View ──
 function AdminView({ orders, onUpdateStatus, onClearCompleted }) {
   const [filter, setFilter] = useState("All");
 
-  const filtered = filter === "All" ? orders : orders.filter((o) => o.status === filter);
+  const filtered = filter==="All" ? orders : orders.filter(o=>o.status===filter);
   const counts = {
-    All: orders.length,
-    Received: orders.filter((o) => o.status === "Received").length,
-    Preparing: orders.filter((o) => o.status === "Preparing").length,
-    Ready: orders.filter((o) => o.status === "Ready").length,
+    All:      orders.length,
+    Received: orders.filter(o=>o.status==="Received").length,
+    Preparing:orders.filter(o=>o.status==="Preparing").length,
+    Ready:    orders.filter(o=>o.status==="Ready").length,
   };
-  const fmt = (ts) =>
-    new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  const revenue = orders.reduce((s,o)=>s+o.total, 0);
 
   return (
-    <div className="admin-page fade-in">
-      <div className="admin-header">
+    <div className="admin-page fade-up">
+      {/* Header */}
+      <div className="admin-top">
         <div>
-          <h2 className="admin-title">Kitchen Dashboard</h2>
-          <div style={{ color: "var(--text2)", fontSize: 13, marginTop: 4 }}>
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "long",
-              day: "numeric",
-              month: "short",
-            })}
+          <div className="admin-heading">Kitchen Dashboard</div>
+          <div className="admin-date">
+            {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-          <div className="live-badge">
-            <div className="live-dot" />
-            LIVE
-          </div>
-          {counts.Ready > 0 && (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+          <div className="live-pill"><div className="live-dot"/>Live</div>
+          {counts.Ready>0 && (
             <button className="clear-btn" onClick={onClearCompleted}>
-              Clear ready ({counts.Ready})
+              Clear completed ({counts.Ready})
             </button>
           )}
         </div>
       </div>
 
-      <div className="admin-stats">
+      {/* KPI Strip */}
+      <div className="kpi-strip">
         {[
-          ["📊", counts.All, "Total", "var(--text)"],
-          ["📋", counts.Received, "Received", "#f59e0b"],
-          ["👨‍🍳", counts.Preparing, "Preparing", "#3b82f6"],
-          ["✅", counts.Ready, "Ready", "#10b981"],
-        ].map(([icon, num, label, col]) => (
-          <div key={label} className="stat-card">
-            <div className="stat-num" style={{ color: col }}>
-              {icon} {num}
-            </div>
-            <div className="stat-label">{label}</div>
+          {label:"Total Orders", val:counts.All,       color:"var(--gold2)"},
+          {label:"Received",     val:counts.Received,  color:"#C9A96E"},
+          {label:"Preparing",    val:counts.Preparing, color:"#7EB8F7"},
+          {label:"Ready",        val:counts.Ready,     color:"#7ECFA0"},
+          {label:"Revenue",      val:`₹${revenue}`,    color:"var(--ink)"},
+        ].map(({label,val,color})=>(
+          <div key={label} className="kpi-card">
+            <div className="kpi-val" style={{color}}>{val}</div>
+            <div className="kpi-label">{label}</div>
           </div>
         ))}
       </div>
 
-      <div className="filter-tabs">
-        {["All", "Received", "Preparing", "Ready"].map((f) => (
-          <button
-            key={f}
-            className={`filter-tab ${filter === f ? "active" : ""}`}
-            onClick={() => setFilter(f)}
-          >
-            {f}
-            {counts[f] > 0 ? ` (${counts[f]})` : ""}
+      {/* Filter tabs */}
+      <div className="filter-row">
+        {["All","Received","Preparing","Ready"].map(f=>(
+          <button key={f} className={`filter-btn ${filter===f?"on":""}`} onClick={()=>setFilter(f)}>
+            {f}{counts[f]>0?` · ${counts[f]}`:""}
           </button>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🍽️</div>
-          <p>
-            {filter === "All"
-              ? "No orders yet. Waiting for customers…"
-              : `No ${filter.toLowerCase()} orders right now.`}
-          </p>
+      {/* Orders — only real orders placed by customers */}
+      {filtered.length===0 ? (
+        <div className="empty-admin">
+          <div className="empty-admin-icon">🍽</div>
+          <div className="empty-admin-title">
+            {filter==="All" ? "No orders yet" : `No ${filter.toLowerCase()} orders`}
+          </div>
+          <div className="empty-admin-text">
+            {filter==="All"
+              ? "Orders placed by customers will appear here in real time."
+              : `Orders with status "${filter}" will appear here.`}
+          </div>
         </div>
       ) : (
         <div className="orders-grid">
-          {[...filtered]
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .map((order) => (
-              <div key={order.id} className="order-tile fade-in" data-status={order.status}>
-                <div className="tile-head">
+          {[...filtered].sort((a,b)=>b.timestamp-a.timestamp).map(order=>(
+            <div key={order.id} className="order-tile fade-up">
+              {/* Coloured top accent bar */}
+              <div className="tile-accent" style={{background:STATUS_COLOR[order.status]}}/>
+
+              <div className="tile-body">
+                {/* Order header */}
+                <div className="tile-top">
                   <div>
                     <div className="tile-id">{order.id}</div>
-                    <div className="tile-time">⏰ {fmt(order.timestamp)}</div>
-                    <div className="tile-user">
-                      👤 {order.customerName}
-                      {order.customerEmail ? ` · ${order.customerEmail}` : " · Walk-in Guest"}
-                    </div>
+                    {/* Full date + time of when order was placed */}
+                    <div className="tile-meta">{fmtDateTime(order.timestamp)}</div>
                   </div>
-                  <div className="tile-table">🪑 T-{order.table}</div>
+                  <div className="tile-table-badge">Table {order.table}</div>
                 </div>
+
+                {/* Items list */}
                 <div className="tile-items">
-                  {order.items.map((i) => (
+                  {order.items.map(i=>(
                     <div key={i.id} className="tile-item">
                       <span className="n">{i.name}</span>
                       <span className="q">×{i.qty}</span>
                     </div>
                   ))}
                 </div>
-                <div className="tile-total">
-                  Total: <span>₹{order.total}</span>
+
+                {/* Total + status pill row */}
+                <div className="tile-footer">
+                  <div className="tile-total">Total: <strong>₹{order.total}</strong></div>
+                  <div style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:STATUS_COLOR[order.status],fontWeight:600,border:`1px solid ${STATUS_COLOR[order.status]}44`,padding:"2px 8px",borderRadius:20,background:`${STATUS_COLOR[order.status]}11`}}>
+                    {order.status}
+                  </div>
                 </div>
+
+                {/* Status update buttons */}
                 <div className="status-btns">
-                  {STATUS_FLOW.map((s) => (
+                  {STATUS_FLOW.map(s=>(
                     <button
                       key={s}
-                      data-s={s}
-                      className={`status-btn ${order.status === s ? "current" : ""}`}
-                      onClick={() => onUpdateStatus(order.id, s)}
+                      className={`status-btn ${order.status===s?`active-${s}`:""}`}
+                      onClick={()=>onUpdateStatus(order.id, s)}
                     >
-                      {STATUS_ICON[s]} {s}
+                      {s}
                     </button>
                   ))}
                 </div>
+
+                {/* "Order Fetched ✓" button — marks Ready AND notifies customer */}
+                <button
+                  className={`mark-ready-btn ${order.status==="Ready"?"is-ready":""}`}
+                  onClick={()=>order.status!=="Ready" && onUpdateStatus(order.id,"Ready")}
+                >
+                  {order.status==="Ready" ? (
+                    <><span className="checkmark">✓</span> Order Fetched</>
+                  ) : (
+                    <><span className="checkmark">✓</span> Mark as Ready &amp; Notify Customer</>
+                  )}
+                </button>
               </div>
-            ))}
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ─── ROOT ───────────────────────────────────────────────────────────────────
+// ── Root App ──
 export default function App() {
-  const [auth, setAuth] = useState(() => readStorage(STORAGE_KEYS.session, null));
-  const [pendingCustomer, setPendingCustomer] = useState(null);
-  const [orders, setOrders] = useState(() => readStorage(STORAGE_KEYS.orders, []));
-  const [profiles, setProfiles] = useState(() => readStorage(STORAGE_KEYS.profiles, {}));
+  const [auth,    setAuth]    = useState(null);
+  const [notAuth, setNotAuth] = useState(null);
+  const [orders,  setOrders]  = useState([]);
 
-  useEffect(() => {
-    writeStorage(STORAGE_KEYS.orders, orders);
-  }, [orders]);
+  // Subscribe to the shared in-memory store
+  useEffect(()=>subscribeOrders(setOrders), []);
 
-  useEffect(() => {
-    writeStorage(STORAGE_KEYS.profiles, profiles);
-  }, [profiles]);
-
-  useEffect(() => {
-    if (auth) writeStorage(STORAGE_KEYS.session, auth);
-    else localStorage.removeItem(STORAGE_KEYS.session);
-  }, [auth]);
-
-  const profile = useMemo(() => {
-    if (!auth || auth.role !== "customer" || !auth.userKey) return null;
-    return profiles[auth.userKey] || null;
-  }, [auth, profiles]);
-
-  const recommendations = useMemo(() => getRecommendations(profile), [profile]);
-
-  const handleGuest = () =>
-    setAuth({
-      role: "guest",
-      name: "Walk-in Guest",
-      email: null,
-      picture: null,
-      userKey: null,
-    });
-
+  const handleGuest  = () => setAuth({ role:"guest", name:"Guest", email:null, picture:null });
   const handleGoogle = (user) => {
-    const isAdmin = ADMIN_EMAILS.map((e) => e.toLowerCase()).includes(
-      user.email.toLowerCase()
-    );
-
-    if (isAdmin) {
-      setAuth({ role: "admin", ...user });
-      setPendingCustomer(null);
-      return;
-    }
-
-    setPendingCustomer(user);
+    const isAdmin = ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(user.email.toLowerCase());
+    if (isAdmin) { setAuth({ role:"admin", ...user }); setNotAuth(null); }
+    else         { setNotAuth(user); }
   };
-
-  const handleContinueAsCustomer = () => {
-    if (!pendingCustomer) return;
-
-    const userKey = getCustomerKey(pendingCustomer);
-    const existingProfile = profiles[userKey];
-
-    setProfiles((prev) =>
-      existingProfile
-        ? prev
-        : {
-            ...prev,
-            [userKey]: createUserProfile(pendingCustomer),
-          }
-    );
-
-    setAuth({
-      role: "customer",
-      ...pendingCustomer,
-      userKey,
-    });
-    setPendingCustomer(null);
-  };
-
   const handleSignOut = () => {
     window.google?.accounts?.id?.disableAutoSelect?.();
-    setAuth(null);
-    setPendingCustomer(null);
+    setAuth(null); setNotAuth(null);
   };
 
-  const handlePlaceOrder = (order, selectedTable) => {
-    setOrders((prev) => [order, ...prev]);
-
-    if (auth?.role === "customer" && auth.userKey) {
-      setProfiles((prev) => ({
-        ...prev,
-        [auth.userKey]: updateProfileWithOrder(prev[auth.userKey], { ...auth, table: selectedTable }, order),
-      }));
-
-      setAuth((prev) =>
-        prev
-          ? {
-              ...prev,
-              table: selectedTable,
-            }
-          : prev
-      );
-    }
-  };
-
-  const handleUpdateStatus = (id, status) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-  };
-
-  const handleClearCompleted = () => {
-    setOrders((prev) => prev.filter((o) => o.status !== "Ready"));
-  };
+  // Only real orders from customers flow through here — no sample data
+  const handlePlaceOrder     = (o)    => saveOrders([o, ...orders]);
+  const handleUpdateStatus   = (id,s) => saveOrders(orders.map(o=>o.id===id ? {...o, status:s} : o));
+  const handleClearCompleted = ()     => saveOrders(orders.filter(o=>o.status!=="Ready"));
 
   const isAdmin = auth?.role === "admin";
-  const isCustomer = auth?.role === "customer";
 
   return (
     <>
       <style>{css}</style>
 
-      {!auth && !pendingCustomer && <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle} />}
-
-      {!auth && pendingCustomer && (
-        <NotAuthorisedScreen
-          user={pendingCustomer}
-          onContinueAsCustomer={handleContinueAsCustomer}
-          onSignOut={handleSignOut}
-        />
-      )}
+      {!auth && !notAuth && <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle}/>}
+      {!auth && notAuth  && <NotAuthorisedScreen user={notAuth} onSignOut={handleSignOut}/>}
 
       {auth && (
-        <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+        <div style={{minHeight:"100vh", background:"var(--paper)"}}>
           <nav className="top-nav">
-            <div className="logo">
-              Bistro<span>Spice</span>
-            </div>
+            <div className="nav-brand">Bistro<em>Spice</em></div>
             <div className="nav-right">
-              <span className={`role-badge ${isAdmin ? "role-admin" : "role-user"}`}>
-                {isAdmin ? "👑 Admin" : isCustomer ? "👤 Customer" : "🍽 Guest"}
+              <span className={`nav-role ${isAdmin?"admin":"guest"}`}>
+                {isAdmin ? "Admin" : "Guest"}
               </span>
-              {auth.picture && (
-                <div className="user-chip">
-                  <img
-                    className="user-avatar"
-                    src={auth.picture}
-                    alt={auth.name}
-                    referrerPolicy="no-referrer"
-                  />
-                  <span className="user-name">{auth.name}</span>
+              {auth.picture ? (
+                <div className="nav-user">
+                  <img className="nav-avatar" src={auth.picture} alt={auth.name} referrerPolicy="no-referrer"/>
+                  <span className="nav-name">{auth.name}</span>
                 </div>
-              )}
-              <button className="sign-out-btn" onClick={handleSignOut}>
-                {isAdmin || isCustomer ? "Sign Out" : "← Back"}
+              ) : auth.name !== "Guest" ? (
+                <div className="nav-user">
+                  <div className="nav-avatar-init">{auth.name?.[0]}</div>
+                  <span className="nav-name">{auth.name}</span>
+                </div>
+              ) : null}
+              <button className="nav-signout" onClick={handleSignOut}>
+                {isAdmin ? "Sign out" : "← Back"}
               </button>
             </div>
           </nav>
 
-          {isAdmin ? (
-            <AdminView
-              orders={orders}
-              onUpdateStatus={handleUpdateStatus}
-              onClearCompleted={handleClearCompleted}
-            />
-          ) : (
-            <CustomerView
-              auth={auth}
-              orders={orders}
-              profile={profile}
-              recommendations={recommendations}
-              onPlaceOrder={handlePlaceOrder}
-            />
-          )}
+          {isAdmin
+            ? <AdminView orders={orders} onUpdateStatus={handleUpdateStatus} onClearCompleted={handleClearCompleted}/>
+            : <CustomerView orders={orders} onPlaceOrder={handlePlaceOrder}/>
+          }
         </div>
       )}
     </>

@@ -50,12 +50,13 @@ const css = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   :root{
-    --ink:#1a1714;--ink2:#4a453e;--ink3:#8a847a;
-    --paper:#faf8f4;--paper2:#f2ede5;--paper3:#e8e0d4;
-    --gold:#C9A96E;--gold2:#a07840;
-    --line:rgba(26,23,20,0.10);--line2:rgba(26,23,20,0.05);
-    --green:#2e8a5a;--green-bg:rgba(126,207,160,0.12);--green-border:rgba(126,207,160,0.5);
+    --ink:#2c3e50;--ink2:#546e7a;--ink3:#90a4ae;
+    --paper:#f0f4f8;--paper2:#e3eaf0;--paper3:#cdd8e3;
+    --gold:#5c8fa8;--gold2:#3d6b82;
+    --line:rgba(44,62,80,0.09);--line2:rgba(44,62,80,0.04);
+    --green:#2e7d5e;--green-bg:rgba(46,125,94,0.08);--green-border:rgba(46,125,94,0.35);
     --r:6px;--r2:3px;
+  }
   }
   html,body{background:var(--paper);color:var(--ink);}
   body{font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}

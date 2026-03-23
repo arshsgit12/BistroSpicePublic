@@ -731,8 +731,8 @@ export default function App() {
   const handleGuest  = () => setAuth({ role:"guest", name:"Guest", email:null, picture:null });
   const handleGoogle = (user) => {
     const isAdmin = ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(user.email.toLowerCase());
-    if (isAdmin) { setAuth({ role:"admin", ...user }); setNotAuth(null); }
-    else         { setNotAuth(user); }
+    setAuth({ role: isAdmin ? "admin" : "customer", ...user });
+    setNotAuth(null);
   };
   const handleSignOut = () => {
     window.google?.accounts?.id?.disableAutoSelect?.();

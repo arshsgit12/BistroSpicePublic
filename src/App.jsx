@@ -21,312 +21,397 @@ const MENU = [
   { id:15, category:"Desserts",  name:"Kulfi",                price:100, emoji:"🍦", desc:"Traditional Indian ice cream" },
 ];
 
-const CATEGORIES  = ["All", ...Array.from(new Set(MENU.map(i => i.category)))];
-const STATUS_FLOW = ["Received", "Preparing", "Ready"];
-const STATUS_COLOR = { Received:"#C9A96E", Preparing:"#7EB8F7", Ready:"#7ECFA0" };
-const TABLES = Array.from({ length:10 }, (_, i) => i + 1);
+const CATEGORIES   = ["All", ...Array.from(new Set(MENU.map(i => i.category)))];
+const STATUS_FLOW  = ["Received", "Preparing", "Ready"];
+const STATUS_COLOR = { Received:"#60a5fa", Preparing:"#f59e0b", Ready:"#34d399" };
+const TABLES       = Array.from({ length:10 }, (_, i) => i + 1);
+
 function genId() { return "ORD-" + Math.random().toString(36).slice(2,6).toUpperCase(); }
 
-// ── In-memory store shared between customer and admin ──
-let _orders = [];
-let _listeners = [];
-function saveOrders(o) { _orders=[...o]; _listeners.forEach(fn=>fn([..._orders])); }
-function subscribeOrders(fn) { _listeners.push(fn); return ()=>{ _listeners=_listeners.filter(l=>l!==fn); }; }
+// ─── PERSISTENT STORAGE ────────────────────────────────────────────────────
+// Orders stored in sessionStorage so they survive page refresh within the tab
+// Auth stored in localStorage so login persists across refreshes
+function loadOrders() {
+  try { return JSON.parse(sessionStorage.getItem("bs_orders") || "[]"); } catch { return []; }
+}
+function persistOrders(orders) {
+  try { sessionStorage.setItem("bs_orders", JSON.stringify(orders)); } catch {}
+}
+function loadRatings() {
+  try { return JSON.parse(sessionStorage.getItem("bs_ratings") || "{}"); } catch { return {}; }
+}
+function persistRatings(ratings) {
+  try { sessionStorage.setItem("bs_ratings", JSON.stringify(ratings)); } catch {}
+}
+function loadAuth() {
+  try { return JSON.parse(localStorage.getItem("bs_auth") || "null"); } catch { return null; }
+}
+function persistAuth(auth) {
+  try {
+    if (auth) localStorage.setItem("bs_auth", JSON.stringify(auth));
+    else localStorage.removeItem("bs_auth");
+  } catch {}
+}
 
-// Format timestamp → "12 Jul 2025, 02:34 PM"
+// ─── SHARED IN-MEMORY STORE (pub/sub across tabs via storage events) ───────
+let _orders   = loadOrders();
+let _ratings  = loadRatings();
+let _listeners = [];
+
+function saveOrders(o) {
+  _orders = [...o];
+  persistOrders(_orders);
+  _listeners.forEach(fn => fn({ orders:[..._orders], ratings:{..._ratings} }));
+}
+function saveRating(itemId, stars) {
+  if (!_ratings[itemId]) _ratings[itemId] = [];
+  _ratings[itemId] = [..._ratings[itemId], stars];
+  persistRatings(_ratings);
+  _listeners.forEach(fn => fn({ orders:[..._orders], ratings:{..._ratings} }));
+}
+function subscribeStore(fn) {
+  _listeners.push(fn);
+  fn({ orders:[..._orders], ratings:{..._ratings} }); // emit current state immediately
+  return () => { _listeners = _listeners.filter(l => l !== fn); };
+}
+
+// Cross-tab sync — when another tab places an order, this tab picks it up
+function setupCrossTabSync() {
+  window.addEventListener("storage", (e) => {
+    if (e.key === "bs_orders") {
+      try {
+        _orders = JSON.parse(e.newValue || "[]");
+        _listeners.forEach(fn => fn({ orders:[..._orders], ratings:{..._ratings} }));
+      } catch {}
+    }
+    if (e.key === "bs_ratings") {
+      try {
+        _ratings = JSON.parse(e.newValue || "{}");
+        _listeners.forEach(fn => fn({ orders:[..._orders], ratings:{..._ratings} }));
+      } catch {}
+    }
+  });
+}
+setupCrossTabSync();
+
 function fmtDateTime(ts) {
-  const d = new Date(ts);
-  return d.toLocaleString("en-IN", {
+  return new Date(ts).toLocaleString("en-IN", {
     day:"2-digit", month:"short", year:"numeric",
-    hour:"2-digit", minute:"2-digit", hour12:true
+    hour:"2-digit", minute:"2-digit", hour12:true,
   }).replace(",", " ·");
 }
-// Format just time → "02:34 PM"
-function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true });
-}
 
+// ─── STYLES ────────────────────────────────────────────────────────────────
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-  :root{
-    --ink:#2c3e50;--ink2:#546e7a;--ink3:#90a4ae;
-    --paper:#f0f4f8;--paper2:#e3eaf0;--paper3:#cdd8e3;
-    --gold:#5c8fa8;--gold2:#3d6b82;
-    --line:rgba(44,62,80,0.09);--line2:rgba(44,62,80,0.04);
-    --green:#2e7d5e;--green-bg:rgba(46,125,94,0.08);--green-border:rgba(46,125,94,0.35);
-    --r:6px;--r2:3px;
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap');
+
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  :root {
+    --bg:     #0d0d0f;
+    --bg2:    #141417;
+    --bg3:    #1c1c21;
+    --bg4:    #242429;
+    --line:   rgba(255,255,255,0.07);
+    --line2:  rgba(255,255,255,0.04);
+    --text:   #e8e6e3;
+    --text2:  #9b9893;
+    --text3:  #5c5a57;
+    --accent: #c8a97e;
+    --accent2:#a07850;
+    --blue:   #60a5fa;
+    --amber:  #f59e0b;
+    --green:  #34d399;
+    --red:    #f87171;
+    --r:      8px;
+    --r2:     4px;
   }
-  }
-  html,body{background:var(--paper);color:var(--ink);}
-  body{font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
-  button{cursor:pointer;font-family:inherit;}
-  ::-webkit-scrollbar{width:3px;}
-  ::-webkit-scrollbar-thumb{background:var(--paper3);border-radius:2px;}
+  html, body { background: var(--bg); color: var(--text); }
+  body { font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  button { cursor: pointer; font-family: inherit; }
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
 
-  /* AUTH */
-  .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--paper);background-image:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(201,169,110,0.12),transparent);}
-  .auth-card{width:100%;max-width:420px;background:#fff;border:1px solid var(--line);border-radius:var(--r2);padding:52px 48px 44px;position:relative;box-shadow:0 2px 4px rgba(26,23,20,0.04),0 12px 40px rgba(26,23,20,0.07);}
-  .auth-card::before{content:'';position:absolute;top:0;left:48px;right:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
-  .auth-brand{text-align:center;margin-bottom:44px;}
-  .auth-brand-name{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;letter-spacing:0.08em;color:var(--ink);line-height:1;}
-  .auth-brand-name em{font-style:italic;color:var(--gold2);}
-  .auth-tagline{font-size:10px;letter-spacing:0.22em;color:var(--ink3);text-transform:uppercase;margin-top:10px;}
-  .auth-cta{width:100%;padding:14px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r2);font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;letter-spacing:0.12em;transition:background 0.2s,transform 0.1s;margin-bottom:10px;}
-  .auth-cta:hover{background:var(--ink2);}
-  .auth-cta:active{transform:scale(0.99);}
-  .auth-cta-sub{font-size:11px;color:var(--ink3);text-align:center;letter-spacing:0.04em;}
-  .auth-divider{display:flex;align-items:center;gap:16px;margin:28px 0;}
-  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--line);}
-  .auth-divider span{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;}
-  .google-btn{width:100%;padding:13px 20px;border:1px solid var(--line);background:var(--paper);color:var(--ink2);border-radius:var(--r2);font-size:14px;font-weight:400;letter-spacing:0.03em;display:flex;align-items:center;justify-content:center;gap:10px;transition:border-color 0.2s,background 0.2s;}
-  .google-btn:hover:not(:disabled){border-color:var(--gold);background:var(--paper2);}
-  .google-btn:disabled{opacity:0.45;cursor:not-allowed;}
-  .auth-note{font-size:11px;color:var(--ink3);text-align:center;margin-top:20px;line-height:1.7;}
-  .auth-error{margin-top:12px;font-size:12px;color:#b04040;background:rgba(176,64,64,0.06);padding:10px 14px;border-radius:var(--r2);border:1px solid rgba(176,64,64,0.18);text-align:center;}
+  /* ── AUTH ── */
+  .auth-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--bg); }
+  .auth-card { width:100%; max-width:400px; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:48px 40px 40px; position:relative; }
+  .auth-card::before { content:''; position:absolute; top:0; left:40px; right:40px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+  .auth-brand { text-align:center; margin-bottom:40px; }
+  .auth-brand-name { font-family:'DM Serif Display',serif; font-size:36px; color:var(--text); letter-spacing:0.02em; line-height:1; }
+  .auth-brand-name em { font-style:italic; color:var(--accent); }
+  .auth-tagline { font-size:11px; letter-spacing:0.18em; color:var(--text3); text-transform:uppercase; margin-top:10px; }
+  .auth-cta { width:100%; padding:13px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; letter-spacing:0.04em; transition:background 0.2s,transform 0.1s; margin-bottom:10px; }
+  .auth-cta:hover { background:var(--accent2); }
+  .auth-cta:active { transform:scale(0.99); }
+  .auth-cta-sub { font-size:11px; color:var(--text3); text-align:center; }
+  .auth-divider { display:flex; align-items:center; gap:14px; margin:24px 0; }
+  .auth-divider::before, .auth-divider::after { content:''; flex:1; height:1px; background:var(--line); }
+  .auth-divider span { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text3); white-space:nowrap; }
+  .google-btn { width:100%; padding:12px 18px; border:1px solid var(--line); background:var(--bg3); color:var(--text2); border-radius:var(--r2); font-size:13px; font-weight:400; display:flex; align-items:center; justify-content:center; gap:10px; transition:border-color 0.2s,background 0.2s; }
+  .google-btn:hover:not(:disabled) { border-color:var(--accent); background:var(--bg4); color:var(--text); }
+  .google-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .auth-note { font-size:11px; color:var(--text3); text-align:center; margin-top:18px; line-height:1.7; }
+  .auth-error { margin-top:12px; font-size:12px; color:var(--red); background:rgba(248,113,113,0.07); padding:10px 14px; border-radius:var(--r2); border:1px solid rgba(248,113,113,0.2); text-align:center; }
 
-  /* NOT AUTH */
-  .notauth-icon{font-size:36px;text-align:center;margin-bottom:20px;opacity:0.4;}
-  .notauth-title{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:400;text-align:center;margin-bottom:10px;}
-  .notauth-body{font-size:13px;color:var(--ink2);text-align:center;line-height:1.7;margin-bottom:20px;}
-  .notauth-list{background:var(--paper2);border:1px solid var(--line);border-radius:var(--r2);padding:14px 18px;margin-bottom:24px;}
-  .notauth-list-title{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px;}
-  .notauth-email{font-family:monospace;font-size:12px;color:var(--ink2);padding:2px 0;}
-  .back-btn{width:100%;padding:12px;border:1px solid var(--line);background:transparent;color:var(--ink2);border-radius:var(--r2);font-size:12px;letter-spacing:0.08em;transition:all 0.18s;}
-  .back-btn:hover{border-color:var(--ink2);color:var(--ink);}
+  /* ── NAV ── */
+  .top-nav { background:var(--bg2); border-bottom:1px solid var(--line); height:56px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; gap:12px; }
+  .nav-brand { font-family:'DM Serif Display',serif; font-size:20px; color:var(--text); flex-shrink:0; }
+  .nav-brand em { font-style:italic; color:var(--accent); }
+  .nav-right { display:flex; align-items:center; gap:8px; min-width:0; }
+  .nav-role { font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:4px 10px; border-radius:20px; border:1px solid; white-space:nowrap; flex-shrink:0; }
+  .nav-role.admin { border-color:rgba(200,169,126,0.35); color:var(--accent); background:rgba(200,169,126,0.08); }
+  .nav-role.customer { border-color:var(--line); color:var(--text3); }
+  .nav-role.guest { border-color:var(--line); color:var(--text3); }
+  .nav-user { display:flex; align-items:center; gap:7px; min-width:0; max-width:140px; }
+  .nav-avatar { width:26px; height:26px; border-radius:50%; flex-shrink:0; object-fit:cover; border:1px solid var(--line); }
+  .nav-avatar-init { width:26px; height:26px; border-radius:50%; flex-shrink:0; background:var(--bg4); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:var(--text2); }
+  .nav-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--text2); }
+  .nav-signout { padding:5px 12px; border:1px solid var(--line); background:transparent; color:var(--text3); border-radius:var(--r2); font-size:11px; letter-spacing:0.06em; transition:all 0.18s; white-space:nowrap; flex-shrink:0; }
+  .nav-signout:hover { border-color:var(--red); color:var(--red); }
 
-  /* NAV */
-  .top-nav{background:#fff;border-bottom:1px solid var(--line);height:58px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;}
-  .nav-brand{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;letter-spacing:0.08em;color:var(--ink);flex-shrink:0;}
-  .nav-brand em{font-style:italic;color:var(--gold2);}
-  .nav-right{display:flex;align-items:center;gap:10px;min-width:0;}
-  .nav-role{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:4px 12px;border-radius:20px;border:1px solid;white-space:nowrap;flex-shrink:0;}
-  .nav-role.admin{border-color:rgba(201,169,110,0.5);color:var(--gold2);background:rgba(201,169,110,0.08);}
-  .nav-role.guest{border-color:var(--line);color:var(--ink3);}
-  .nav-user{display:flex;align-items:center;gap:8px;min-width:0;max-width:150px;}
-  .nav-avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;object-fit:cover;border:1px solid var(--line);}
-  .nav-avatar-init{width:28px;height:28px;border-radius:50%;flex-shrink:0;background:var(--paper2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--ink2);}
-  .nav-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--ink2);}
-  .nav-signout{padding:5px 14px;border:1px solid var(--line);background:transparent;color:var(--ink3);border-radius:var(--r2);font-size:11px;letter-spacing:0.08em;transition:all 0.18s;white-space:nowrap;flex-shrink:0;}
-  .nav-signout:hover{border-color:#b04040;color:#b04040;}
+  /* ── CUSTOMER MENU ── */
+  .menu-page { max-width:500px; margin:0 auto; padding-bottom:150px; }
+  .table-hero { margin:18px 14px 0; background:var(--bg3); border:1px solid var(--line); border-radius:var(--r); padding:18px 22px; display:flex; align-items:center; gap:14px; cursor:pointer; position:relative; overflow:hidden; transition:border-color 0.2s; }
+  .table-hero:hover { border-color:var(--accent); }
+  .table-hero-num { font-family:'DM Serif Display',serif; font-size:48px; color:var(--accent); line-height:1; }
+  .table-hero-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text3); margin-bottom:3px; }
+  .table-hero-hint { font-size:12px; color:var(--text2); }
+  .table-hero-chevron { margin-left:auto; color:var(--text3); font-size:20px; }
+  .table-prompt { margin:18px 14px 0; padding:14px 18px; border:1px dashed var(--bg4); border-radius:var(--r); cursor:pointer; display:flex; align-items:center; gap:12px; background:var(--bg2); transition:border-color 0.2s; }
+  .table-prompt:hover { border-color:var(--accent); }
+  .table-prompt-text { flex:1; font-size:13px; color:var(--text3); }
+  .table-prompt-cta { font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--accent); font-weight:500; }
+  .cat-strip { display:flex; gap:6px; padding:18px 14px 0; overflow-x:auto; scrollbar-width:none; }
+  .cat-strip::-webkit-scrollbar { display:none; }
+  .cat-pill { white-space:nowrap; padding:6px 16px; border:1px solid var(--line); background:transparent; color:var(--text3); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; font-weight:500; flex-shrink:0; border-radius:20px; transition:all 0.2s; }
+  .cat-pill.on { background:var(--accent); border-color:var(--accent); color:var(--bg); }
+  .menu-group { padding:22px 14px 0; }
+  .menu-group-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text3); margin-bottom:12px; display:flex; align-items:center; gap:10px; }
+  .menu-group-label::after { content:''; flex:1; height:1px; background:var(--line2); }
+  .menu-list { display:flex; flex-direction:column; gap:2px; }
+  .menu-item { background:var(--bg2); padding:14px 18px; display:flex; align-items:center; gap:12px; transition:background 0.15s; border-radius:var(--r); border:1px solid transparent; }
+  .menu-item:hover { background:var(--bg3); border-color:var(--line); }
+  .menu-item-emoji { font-size:26px; width:40px; text-align:center; flex-shrink:0; }
+  .menu-item-body { flex:1; min-width:0; }
+  .menu-item-name { font-size:14px; font-weight:500; color:var(--text); margin-bottom:2px; }
+  .menu-item-desc { font-size:11px; color:var(--text3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .menu-item-price { font-family:'DM Serif Display',serif; font-size:16px; color:var(--accent); margin-top:4px; }
+  .item-ctrl { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .item-btn { width:28px; height:28px; border-radius:50%; border:1px solid var(--line); background:var(--bg3); color:var(--text); font-size:16px; display:flex; align-items:center; justify-content:center; transition:all 0.15s; line-height:1; }
+  .item-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .item-qty { font-size:14px; font-weight:500; min-width:16px; text-align:center; color:var(--text); }
+  .item-add { padding:6px 16px; border-radius:var(--r2); border:1px solid var(--line); background:transparent; color:var(--text2); font-size:11px; letter-spacing:0.06em; font-weight:500; transition:all 0.18s; text-transform:uppercase; }
+  .item-add:hover { border-color:var(--accent); color:var(--accent); }
+  .cart-bar { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:500px; padding:12px 14px 26px; background:var(--bg2); border-top:1px solid var(--line); z-index:50; }
+  .cart-bar-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .cart-bar-count { font-size:12px; color:var(--text3); }
+  .cart-bar-count strong { color:var(--text); font-weight:600; }
+  .cart-total { font-family:'DM Serif Display',serif; font-size:20px; color:var(--text); }
+  .cart-place { width:100%; padding:13px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; letter-spacing:0.04em; transition:background 0.2s,transform 0.1s; }
+  .cart-place:hover { background:var(--accent2); color:#fff; }
+  .cart-place:active { transform:scale(0.99); }
 
-  /* CUSTOMER MENU */
-  .menu-page{max-width:520px;margin:0 auto;padding-bottom:150px;}
-  .table-hero{margin:20px 16px 0;background:var(--ink);border-radius:var(--r2);padding:20px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;overflow:hidden;position:relative;transition:background 0.2s;}
-  .table-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(201,169,110,0.18) 0%,transparent 60%);pointer-events:none;}
-  .table-hero:hover{background:var(--ink2);}
-  .table-hero-num{font-family:'Cormorant Garamond',serif;font-size:52px;font-weight:300;color:var(--gold);line-height:1;letter-spacing:-1px;}
-  .table-hero-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:3px;}
-  .table-hero-hint{font-size:12px;color:rgba(255,255,255,0.55);}
-  .table-hero-chevron{margin-left:auto;color:rgba(255,255,255,0.25);font-size:22px;}
-  .table-prompt{margin:20px 16px 0;padding:16px 20px;border:1px dashed var(--paper3);border-radius:var(--r2);cursor:pointer;display:flex;align-items:center;gap:12px;background:var(--paper2);transition:border-color 0.2s;}
-  .table-prompt:hover{border-color:var(--gold);}
-  .table-prompt-text{flex:1;font-size:13px;color:var(--ink3);}
-  .table-prompt-cta{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold2);font-weight:600;}
-  .cat-strip{display:flex;gap:6px;padding:20px 16px 0;overflow-x:auto;scrollbar-width:none;}
-  .cat-strip::-webkit-scrollbar{display:none;}
-  .cat-pill{white-space:nowrap;padding:6px 18px;border:1px solid var(--line);background:transparent;color:var(--ink3);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;flex-shrink:0;border-radius:20px;transition:all 0.2s;font-family:'Inter',sans-serif;}
-  .cat-pill.on{background:var(--ink);border-color:var(--ink);color:var(--paper);}
-  .menu-group{padding:24px 16px 0;}
-  .menu-group-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);margin-bottom:14px;display:flex;align-items:center;gap:12px;}
-  .menu-group-label::after{content:'';flex:1;height:1px;background:var(--line2);}
-  .menu-list{display:flex;flex-direction:column;gap:2px;}
-  .menu-item{background:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px;transition:background 0.15s;border-radius:var(--r);border:1px solid transparent;}
-  .menu-item:hover{background:var(--paper2);border-color:var(--line);}
-  .menu-item-emoji{font-size:28px;width:42px;text-align:center;flex-shrink:0;}
-  .menu-item-body{flex:1;min-width:0;}
-  .menu-item-name{font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px;}
-  .menu-item-desc{font-size:12px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .menu-item-price{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:400;color:var(--gold2);margin-top:4px;}
-  .item-ctrl{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-  .item-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:18px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;line-height:1;}
-  .item-btn:hover{border-color:var(--ink);background:var(--ink);color:var(--paper);}
-  .item-qty{font-size:15px;font-weight:500;min-width:18px;text-align:center;color:var(--ink);}
-  .item-add{padding:7px 18px;border-radius:var(--r2);border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:11px;letter-spacing:0.08em;font-weight:500;transition:all 0.18s;text-transform:uppercase;}
-  .item-add:hover{border-color:var(--ink);background:var(--ink);color:var(--paper);}
-  .cart-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;padding:12px 16px 28px;background:#fff;border-top:1px solid var(--line);z-index:50;}
-  .cart-bar-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-  .cart-bar-count{font-size:12px;color:var(--ink3);}
-  .cart-bar-count strong{color:var(--ink);font-weight:600;}
-  .cart-total{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--ink);}
-  .cart-place{width:100%;padding:14px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r2);font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;letter-spacing:0.14em;transition:background 0.2s,transform 0.1s;}
-  .cart-place:hover{background:var(--ink2);}
-  .cart-place:active{transform:scale(0.99);}
+  /* ── CONFIRM PAGE ── */
+  .confirm-page { max-width:500px; margin:0 auto; padding:48px 20px 40px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .confirm-seal { font-size:56px; margin-bottom:20px; animation:sealIn 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes sealIn { from { transform:scale(0.3) rotate(-8deg); opacity:0; } to { transform:scale(1) rotate(0); opacity:1; } }
+  .confirm-title { font-family:'DM Serif Display',serif; font-size:34px; color:var(--text); margin-bottom:8px; }
+  .confirm-sub { font-size:13px; color:var(--text2); margin-bottom:32px; line-height:1.7; }
+  .confirm-receipt { width:100%; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:24px; text-align:left; margin-bottom:20px; position:relative; }
+  .confirm-receipt::before { content:''; position:absolute; top:0; left:24px; right:24px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+  .receipt-id { font-family:'DM Serif Display',serif; font-size:26px; color:var(--accent); margin-bottom:4px; }
+  .receipt-meta { font-size:12px; color:var(--text3); margin-bottom:3px; }
+  .receipt-datetime { font-size:11px; color:var(--text3); opacity:0.6; margin-bottom:18px; }
+  .receipt-items { border-top:1px solid var(--line2); padding-top:14px; display:flex; flex-direction:column; gap:7px; }
+  .receipt-row { display:flex; justify-content:space-between; font-size:13px; }
+  .receipt-row .lbl { color:var(--text2); }
+  .receipt-row .val { font-weight:500; color:var(--text); }
+  .receipt-total { display:flex; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .receipt-total .lbl { color:var(--text3); font-size:11px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; align-self:center; }
+  .receipt-total .val { font-family:'DM Serif Display',serif; font-size:22px; color:var(--accent); }
+  .status-track-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text3); margin:18px 0 10px; font-weight:500; }
+  .status-track { display:flex; gap:3px; width:100%; }
+  .status-step { flex:1; padding:8px 4px; text-align:center; font-size:10px; letter-spacing:0.08em; font-weight:500; text-transform:uppercase; transition:all 0.35s; border:1px solid var(--line); border-radius:var(--r2); }
+  .status-step.done { background:var(--bg3); color:var(--text3); border-color:transparent; }
+  .status-step.current { background:var(--accent); color:var(--bg); border-color:transparent; }
+  .status-step.pending { background:transparent; color:var(--text3); }
+  .ready-banner { margin-top:18px; width:100%; background:rgba(52,211,153,0.07); border:1px solid rgba(52,211,153,0.25); border-radius:var(--r); padding:16px 18px; display:flex; align-items:center; gap:12px; animation:fadeUp 0.4s ease; }
+  .ready-banner-icon { font-size:24px; flex-shrink:0; }
+  .ready-banner-title { font-family:'DM Serif Display',serif; font-size:18px; color:var(--green); margin-bottom:2px; }
+  .ready-banner-sub { font-size:12px; color:var(--text2); line-height:1.5; }
+  .more-btn { padding:11px 32px; border-radius:var(--r2); border:1px solid var(--line); background:transparent; color:var(--text2); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; transition:all 0.2s; margin-top:8px; }
+  .more-btn:hover { border-color:var(--text2); color:var(--text); }
 
-  /* CONFIRM / ORDER STATUS PAGE */
-  .confirm-page{max-width:520px;margin:0 auto;padding:52px 24px 40px;display:flex;flex-direction:column;align-items:center;text-align:center;}
-  .confirm-seal{font-size:60px;margin-bottom:24px;animation:sealIn 0.5s cubic-bezier(0.34,1.56,0.64,1);}
-  @keyframes sealIn{from{transform:scale(0.3) rotate(-8deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
-  .confirm-title{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:300;letter-spacing:0.04em;margin-bottom:8px;}
-  .confirm-sub{font-size:13px;color:var(--ink3);margin-bottom:36px;line-height:1.7;letter-spacing:0.03em;}
-  .confirm-receipt{width:100%;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:28px;text-align:left;margin-bottom:24px;position:relative;}
-  .confirm-receipt::before{content:'';position:absolute;top:0;left:28px;right:28px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
-  .receipt-id{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:300;color:var(--gold2);letter-spacing:0.06em;margin-bottom:4px;}
-  .receipt-meta{font-size:12px;color:var(--ink3);margin-bottom:4px;letter-spacing:0.04em;}
-  .receipt-datetime{font-size:11px;color:var(--ink3);margin-bottom:20px;letter-spacing:0.04em;opacity:0.7;}
-  .receipt-items{border-top:1px solid var(--line2);padding-top:16px;display:flex;flex-direction:column;gap:8px;}
-  .receipt-row{display:flex;justify-content:space-between;font-size:13px;}
-  .receipt-row .lbl{color:var(--ink2);}
-  .receipt-row .val{font-weight:500;color:var(--ink);}
-  .receipt-total{display:flex;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
-  .receipt-total .lbl{color:var(--ink3);font-size:11px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;align-self:center;}
-  .receipt-total .val{font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--gold2);font-weight:400;}
+  /* ── RATING POPUP ── */
+  .rating-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(6px); }
+  .rating-box { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:32px 28px; max-width:380px; width:100%; text-align:center; animation:modalIn 0.3s cubic-bezier(0.175,0.885,0.32,1.1); position:relative; }
+  .rating-box::before { content:''; position:absolute; top:0; left:28px; right:28px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+  @keyframes modalIn { from { opacity:0; transform:translateY(14px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+  .rating-title { font-family:'DM Serif Display',serif; font-size:24px; color:var(--text); margin-bottom:6px; }
+  .rating-sub { font-size:12px; color:var(--text3); margin-bottom:8px; line-height:1.6; }
+  .rating-order-id { font-size:11px; color:var(--accent); letter-spacing:0.08em; margin-bottom:22px; }
+  .rating-items { display:flex; flex-direction:column; gap:14px; margin-bottom:22px; text-align:left; }
+  .rating-item { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .rating-item-name { font-size:13px; color:var(--text2); flex:1; }
+  .stars { display:flex; gap:3px; }
+  .star { font-size:22px; cursor:pointer; transition:transform 0.1s; line-height:1; color:var(--bg4); user-select:none; }
+  .star:hover { transform:scale(1.15); }
+  .star.lit { color:#f59e0b; }
+  .rating-submit { width:100%; padding:12px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; transition:background 0.2s; }
+  .rating-submit:hover { background:var(--accent2); color:#fff; }
+  .rating-skip { width:100%; padding:9px; background:transparent; border:none; color:var(--text3); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; margin-top:8px; transition:color 0.18s; }
+  .rating-skip:hover { color:var(--text2); }
 
-  /* LIVE STATUS TRACK */
-  .status-track-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);margin:20px 0 12px;font-weight:500;}
-  .status-track{display:flex;gap:3px;width:100%;}
-  .status-step{flex:1;padding:9px 4px;text-align:center;font-size:10px;letter-spacing:0.1em;font-weight:500;text-transform:uppercase;transition:all 0.35s;border:1px solid var(--line);border-radius:var(--r2);}
-  .status-step.done{background:var(--paper2);color:var(--ink3);border-color:transparent;}
-  .status-step.current{background:var(--ink);color:var(--paper);border-color:transparent;}
-  .status-step.pending{background:transparent;color:var(--ink3);}
+  /* ── TABLE MODAL ── */
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px); }
+  .modal-box { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:32px; max-width:340px; width:100%; text-align:center; position:relative; animation:modalIn 0.28s cubic-bezier(0.175,0.885,0.32,1.1); }
+  .modal-box::before { content:''; position:absolute; top:0; left:32px; right:32px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+  .modal-title { font-family:'DM Serif Display',serif; font-size:26px; color:var(--text); margin-bottom:8px; }
+  .modal-sub { font-size:12px; color:var(--text3); margin-bottom:22px; line-height:1.6; }
+  .table-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:18px; }
+  .table-chip { aspect-ratio:1; border:1px solid var(--line); border-radius:var(--r2); display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.18s; background:var(--bg3); }
+  .table-chip:hover { border-color:var(--accent); background:var(--bg4); }
+  .table-chip .num { font-family:'DM Serif Display',serif; font-size:20px; color:var(--accent); }
+  .table-chip .lbl { font-size:8px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text3); }
+  .modal-cancel { width:100%; padding:10px; border:1px solid var(--line); background:transparent; color:var(--text3); border-radius:var(--r2); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; transition:all 0.2s; }
+  .modal-cancel:hover { border-color:var(--text3); color:var(--text2); }
 
-  /* ORDER READY BANNER — shown to customer when admin marks Ready */
-  .ready-banner{margin-top:20px;width:100%;background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--r);padding:18px 20px;display:flex;align-items:center;gap:14px;animation:fadeUp 0.4s ease;}
-  .ready-banner-icon{font-size:28px;flex-shrink:0;}
-  .ready-banner-text{flex:1;}
-  .ready-banner-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:var(--green);margin-bottom:2px;}
-  .ready-banner-sub{font-size:12px;color:var(--ink3);line-height:1.5;}
+  /* ── TOAST ── */
+  .toast { position:fixed; bottom:150px; left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid var(--line); color:var(--text); padding:8px 20px; border-radius:20px; font-size:11px; letter-spacing:0.08em; z-index:300; animation:toastIn 0.25s ease; pointer-events:none; white-space:nowrap; text-transform:uppercase; }
+  @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(6px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 
-  .more-btn{padding:12px 36px;border-radius:var(--r2);border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;transition:all 0.2s;margin-top:8px;}
-  .more-btn:hover{border-color:var(--ink);color:var(--ink);}
+  /* ── ADMIN ── */
+  .admin-page { padding:24px 20px; max-width:1060px; margin:0 auto; }
+  .admin-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; gap:12px; flex-wrap:wrap; padding-bottom:22px; border-bottom:1px solid var(--line); }
+  .admin-heading { font-family:'DM Serif Display',serif; font-size:30px; color:var(--text); }
+  .admin-date { font-size:11px; color:var(--text3); margin-top:5px; letter-spacing:0.06em; }
+  .live-pill { display:flex; align-items:center; gap:6px; font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--green); font-weight:600; padding:5px 12px; border-radius:20px; border:1px solid rgba(52,211,153,0.25); background:rgba(52,211,153,0.06); }
+  .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+  .kpi-strip { display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
+  .kpi-card { flex:1; min-width:80px; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:16px 18px; }
+  .kpi-val { font-family:'DM Serif Display',serif; font-size:30px; font-weight:300; line-height:1; margin-bottom:5px; }
+  .kpi-label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text3); }
+  .admin-tabs { display:flex; gap:4px; background:var(--bg2); border-radius:var(--r); padding:4px; width:fit-content; margin-bottom:24px; border:1px solid var(--line); }
+  .admin-tab { padding:7px 18px; border-radius:var(--r2); border:none; background:transparent; color:var(--text3); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500; transition:all 0.18s; }
+  .admin-tab.on { background:var(--bg4); color:var(--text); }
+  .filter-row { display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap; }
+  .filter-btn { padding:6px 16px; border-radius:20px; border:1px solid var(--line); background:transparent; color:var(--text3); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; font-weight:500; transition:all 0.18s; }
+  .filter-btn.on { border-color:var(--accent); background:rgba(200,169,126,0.08); color:var(--accent); }
+  .orders-grid { display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+  .order-tile { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; transition:border-color 0.2s; }
+  .order-tile:hover { border-color:rgba(255,255,255,0.12); }
+  .tile-accent { height:2px; }
+  .tile-body { padding:16px 18px; }
+  .tile-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+  .tile-id { font-family:'DM Serif Display',serif; font-size:18px; color:var(--accent); }
+  .tile-meta { font-size:11px; color:var(--text3); margin-top:2px; }
+  .tile-table-badge { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; background:var(--bg3); border:1px solid var(--line); border-radius:var(--r2); padding:3px 9px; color:var(--text2); font-weight:500; white-space:nowrap; }
+  .tile-items { margin-bottom:12px; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); padding:9px 0; display:flex; flex-direction:column; gap:5px; }
+  .tile-item { display:flex; justify-content:space-between; font-size:12px; }
+  .tile-item .n { color:var(--text2); }
+  .tile-item .q { font-weight:600; color:var(--text); font-size:11px; }
+  .tile-footer { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .tile-total { font-size:12px; color:var(--text3); }
+  .tile-total strong { font-family:'DM Serif Display',serif; font-size:16px; color:var(--accent); font-weight:400; }
+  .status-btns { display:flex; gap:4px; }
+  .status-btn { flex:1; padding:7px 4px; text-align:center; font-size:10px; letter-spacing:0.06em; text-transform:uppercase; font-weight:500; border:1px solid var(--line); border-radius:var(--r2); background:transparent; color:var(--text3); transition:all 0.15s; }
+  .status-btn:hover:not(.sb-active) { border-color:var(--text3); color:var(--text2); }
+  .status-btn.sb-active-Received { background:rgba(96,165,250,0.1); border-color:rgba(96,165,250,0.4); color:var(--blue); }
+  .status-btn.sb-active-Preparing { background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.4); color:var(--amber); }
+  .status-btn.sb-active-Ready { background:rgba(52,211,153,0.08); border-color:rgba(52,211,153,0.3); color:var(--green); }
+  .mark-ready-btn { width:100%; margin-top:9px; padding:10px; background:var(--bg3); color:var(--text2); border:1px solid var(--line); border-radius:var(--r2); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; font-weight:600; display:flex; align-items:center; justify-content:center; gap:7px; transition:all 0.2s; }
+  .mark-ready-btn:hover:not(.is-ready) { background:var(--green); color:var(--bg); border-color:transparent; }
+  .mark-ready-btn.is-ready { background:rgba(52,211,153,0.08); color:var(--green); border-color:rgba(52,211,153,0.3); cursor:default; }
+  .empty-admin { text-align:center; padding:72px 20px; }
+  .empty-admin-icon { font-size:36px; opacity:0.12; margin-bottom:18px; }
+  .empty-admin-title { font-family:'DM Serif Display',serif; font-size:22px; color:var(--text2); margin-bottom:8px; }
+  .empty-admin-text { font-size:13px; color:var(--text3); line-height:1.6; }
+  .clear-btn { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; padding:4px 10px; border-radius:var(--r2); border:1px solid var(--line); background:transparent; color:var(--text3); cursor:pointer; margin-top:5px; transition:all 0.2s; }
+  .clear-btn:hover { border-color:var(--text3); color:var(--text2); }
 
-  /* TABLE MODAL */
-  .modal-bg{position:fixed;inset:0;background:rgba(26,23,20,0.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);}
-  .modal-box{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:36px;max-width:360px;width:100%;text-align:center;position:relative;animation:modalIn 0.28s cubic-bezier(0.175,0.885,0.32,1.1);}
-  @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(0.97);}to{opacity:1;transform:translateY(0) scale(1);}}
-  .modal-box::before{content:'';position:absolute;top:0;left:36px;right:36px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
-  .modal-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:400;margin-bottom:8px;}
-  .modal-sub{font-size:12px;color:var(--ink3);margin-bottom:24px;line-height:1.6;}
-  .table-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px;}
-  .table-chip{aspect-ratio:1;border:1px solid var(--line);border-radius:var(--r2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all 0.18s;background:var(--paper);}
-  .table-chip:hover{border-color:var(--gold);background:rgba(201,169,110,0.06);}
-  .table-chip .num{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--gold2);}
-  .table-chip .lbl{font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink3);}
-  .modal-cancel{width:100%;padding:11px;border:1px solid var(--line);background:transparent;color:var(--ink3);border-radius:var(--r2);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.2s;}
-  .modal-cancel:hover{border-color:var(--ink2);color:var(--ink2);}
+  /* ── ANALYTICS ── */
+  .analytics-section-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--text); margin-bottom:16px; }
+  .analytics-empty { text-align:center; padding:60px 20px; color:var(--text3); font-size:13px; }
+  .analytics-list { display:flex; flex-direction:column; gap:8px; }
+  .analytics-row { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:14px 18px; display:flex; align-items:center; gap:12px; }
+  .analytics-rank { font-family:'DM Serif Display',serif; font-size:18px; color:var(--text3); min-width:26px; text-align:center; }
+  .analytics-emoji { font-size:22px; flex-shrink:0; }
+  .analytics-info { flex:1; min-width:0; }
+  .analytics-name { font-size:13px; font-weight:500; color:var(--text); margin-bottom:6px; }
+  .analytics-bar-wrap { height:4px; background:var(--bg4); border-radius:2px; overflow:hidden; }
+  .analytics-bar { height:100%; border-radius:2px; background:var(--accent); transition:width 0.6s ease; }
+  .analytics-right { text-align:right; flex-shrink:0; }
+  .analytics-count { font-family:'DM Serif Display',serif; font-size:20px; color:var(--accent); line-height:1; }
+  .analytics-count-label { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); margin-top:2px; }
+  .analytics-stars { font-size:11px; color:#f59e0b; }
+  .analytics-rating-val { font-size:10px; color:var(--text3); }
 
-  /* TOAST */
-  .toast{position:fixed;bottom:160px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 22px;border-radius:20px;font-size:11px;letter-spacing:0.1em;z-index:300;animation:toastIn 0.25s ease;pointer-events:none;white-space:nowrap;text-transform:uppercase;}
-  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(6px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+  /* ── ANIMATIONS ── */
+  .fade-up { animation:fadeUp 0.3s ease; }
+  .pop-in  { animation:popIn  0.35s cubic-bezier(0.175,0.885,0.32,1.1); }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px);  } to { opacity:1; transform:translateY(0); } }
+  @keyframes popIn  { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
 
-  /* ADMIN */
-  .admin-page{padding:28px 24px;max-width:1060px;margin:0 auto;}
-  .admin-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;gap:12px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid var(--line);}
-  .admin-heading{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:300;letter-spacing:0.02em;}
-  .admin-date{font-size:11px;color:var(--ink3);margin-top:6px;letter-spacing:0.08em;text-transform:uppercase;}
-  .live-pill{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#2e8a5a;font-weight:600;padding:5px 14px;border-radius:20px;border:1px solid var(--green-border);background:var(--green-bg);}
-  .live-dot{width:6px;height:6px;border-radius:50%;background:#7ECFA0;animation:pulse 1.6s infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
-  .kpi-strip{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;}
-  .kpi-card{flex:1;min-width:90px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;}
-  .kpi-val{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:300;line-height:1;margin-bottom:6px;}
-  .kpi-label{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink3);}
-  .filter-row{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap;}
-  .filter-btn{padding:7px 18px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--ink3);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;transition:all 0.18s;}
-  .filter-btn.on{border-color:var(--ink);background:var(--ink);color:var(--paper);}
-  .orders-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(285px,1fr));}
-
-  /* ORDER TILE */
-  .order-tile{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:box-shadow 0.2s;}
-  .order-tile:hover{box-shadow:0 4px 18px rgba(26,23,20,0.08);}
-  .tile-accent{height:2px;}
-  .tile-body{padding:18px 20px;}
-  .tile-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
-  .tile-id{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:var(--gold2);letter-spacing:0.04em;}
-  .tile-meta{font-size:11px;color:var(--ink3);margin-top:3px;letter-spacing:0.02em;}
-  .tile-datetime{font-size:10px;color:var(--ink3);opacity:0.7;margin-top:1px;letter-spacing:0.02em;}
-  .tile-table-badge{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r2);padding:3px 10px;color:var(--ink2);font-weight:600;white-space:nowrap;align-self:flex-start;}
-  .tile-items{margin-bottom:14px;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:10px 0;display:flex;flex-direction:column;gap:5px;}
-  .tile-item{display:flex;justify-content:space-between;font-size:12px;}
-  .tile-item .n{color:var(--ink2);}
-  .tile-item .q{font-weight:600;color:var(--ink);font-size:11px;}
-  .tile-footer{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-  .tile-total{font-size:12px;color:var(--ink3);}
-  .tile-total strong{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:400;color:var(--gold2);}
-
-  /* STATUS BUTTONS IN ADMIN TILE */
-  .status-btns{display:flex;gap:4px;}
-  .status-btn{flex:1;padding:8px 4px;text-align:center;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;border:1px solid var(--line);border-radius:var(--r2);background:transparent;color:var(--ink3);transition:all 0.15s;}
-  .status-btn:hover:not(.active){border-color:var(--ink3);color:var(--ink2);}
-  .status-btn.active-Received{background:rgba(201,169,110,0.12);border-color:rgba(201,169,110,0.5);color:#a07840;}
-  .status-btn.active-Preparing{background:rgba(126,184,247,0.12);border-color:rgba(126,184,247,0.5);color:#3b6fb0;}
-  .status-btn.active-Ready{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
-
-  /* MARK READY BIG BUTTON */
-  .mark-ready-btn{width:100%;margin-top:10px;padding:11px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r2);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s,transform 0.1s;}
-  .mark-ready-btn:hover{background:var(--green);}
-  .mark-ready-btn:active{transform:scale(0.99);}
-  .mark-ready-btn.is-ready{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);cursor:default;}
-  .checkmark{font-size:14px;}
-
-  .empty-admin{text-align:center;padding:80px 20px;}
-  .empty-admin-icon{font-size:38px;opacity:0.15;margin-bottom:20px;}
-  .empty-admin-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;color:var(--ink2);margin-bottom:8px;}
-  .empty-admin-text{font-size:13px;color:var(--ink3);letter-spacing:0.04em;line-height:1.6;}
-  .clear-btn{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;padding:4px 12px;border-radius:var(--r2);border:1px solid var(--line);background:transparent;color:var(--ink3);cursor:pointer;margin-top:6px;transition:all 0.2s;}
-  .clear-btn:hover{border-color:var(--ink2);color:var(--ink2);}
-
-  /* ANIMATIONS */
-  .fade-up{animation:fadeUp 0.32s ease;}
-  .pop-in{animation:popIn 0.38s cubic-bezier(0.175,0.885,0.32,1.1);}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-  @keyframes popIn{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
-
-  @media(max-width:480px){
-    .auth-card{padding:40px 28px 36px;}
-    .kpi-strip{gap:8px;}
-    .kpi-card{padding:14px;}
-    .kpi-val{font-size:26px;}
-    .orders-grid{grid-template-columns:1fr;}
-    .nav-user{display:none;}
+  @media(max-width:480px) {
+    .kpi-strip { gap:8px; }
+    .kpi-card  { padding:12px; }
+    .kpi-val   { font-size:24px; }
+    .orders-grid { grid-template-columns:1fr; }
+    .nav-user  { display:none; }
   }
 `;
 
-// ── Google Sign-In ──
+// ─── GOOGLE GIS ─────────────────────────────────────────────────────────────
 function useGIS() {
   const [ready, setReady] = useState(!!window.google?.accounts);
   useEffect(() => {
-    if (window.google?.accounts) return;
+    if (window.google?.accounts) { setReady(true); return; }
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client";
-    s.async = true; s.onload = () => setReady(true);
+    s.async = true;
+    s.onload = () => setReady(true);
     document.head.appendChild(s);
   }, []);
+
   const signIn = useCallback((onSuccess, onError) => {
-    if (!window.google?.accounts?.id) { onError("Google Sign-In SDK not loaded."); return; }
+    if (!window.google?.accounts?.id) { onError("Google Sign-In not loaded."); return; }
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: (resp) => {
-        try { const p = JSON.parse(atob(resp.credential.split(".")[1])); onSuccess({ name:p.name, email:p.email, picture:p.picture }); }
-        catch { onError("Could not parse response."); }
+        try {
+          const p = JSON.parse(atob(resp.credential.split(".")[1]));
+          onSuccess({ name:p.name, email:p.email, picture:p.picture });
+        } catch { onError("Could not read sign-in response."); }
       },
       ux_mode: "popup",
     });
     window.google.accounts.id.prompt((n) => {
       if (n.isNotDisplayed() || n.isSkippedMoment()) {
         const el = document.getElementById("g-btn-slot");
-        if (el) { el.innerHTML = ""; window.google.accounts.id.renderButton(el, { theme:"filled_black", size:"large", width:320 }); }
+        if (el) { el.innerHTML = ""; window.google.accounts.id.renderButton(el, { theme:"filled_black", size:"large", width:300 }); }
       }
     });
   }, []);
+
   return { ready, signIn };
 }
 
-// ── Auth Screen ──
+// ─── AUTH SCREEN ─────────────────────────────────────────────────────────────
 function AuthScreen({ onGuest, onGoogle }) {
   const { ready, signIn } = useGIS();
   const [error, setError] = useState("");
   const go = () => { setError(""); signIn(onGoogle, setError); };
+
   return (
     <div className="auth-wrap">
       <div className="auth-card fade-up">
         <div className="auth-brand">
           <div className="auth-brand-name">Bistro<em>Spice</em></div>
-          <div className="auth-tagline">Fine Dining · Table Ordering</div>
+          <div className="auth-tagline">Table Ordering System</div>
         </div>
         <button className="auth-cta" onClick={onGuest}>Browse Menu &amp; Order</button>
-        <p className="auth-cta-sub">Customers — no sign-in required</p>
-        <div className="auth-divider"><span>Restaurant Staff</span></div>
+        <p className="auth-cta-sub">Continue as guest — no sign-in needed</p>
+        <div className="auth-divider"><span>Or sign in</span></div>
         <div id="g-btn-slot" style={{display:"flex",justifyContent:"center",minHeight:44,marginBottom:8}} />
         <button className="google-btn" onClick={go} disabled={!ready}>
           <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
@@ -338,37 +423,19 @@ function AuthScreen({ onGuest, onGoogle }) {
           {ready ? "Sign in with Google" : "Loading…"}
         </button>
         {error && <div className="auth-error">{error}</div>}
-        <p className="auth-note">Staff access requires an authorised Google account.<br />Contact your restaurant manager for access.</p>
+        <p className="auth-note">Admin staff sign in with their authorised Google account.<br/>Everyone else gets the menu directly.</p>
       </div>
     </div>
   );
 }
 
-// ── Not Authorised Screen ──
-function NotAuthorisedScreen({ user, onSignOut }) {
-  return (
-    <div className="auth-wrap">
-      <div className="auth-card fade-up">
-        <div className="notauth-icon">🔒</div>
-        <div className="notauth-title">Access Denied</div>
-        <p className="notauth-body"><strong>{user.email}</strong> is not authorised.<br/>Ask the restaurant owner to add your email.</p>
-        <div className="notauth-list">
-          <div className="notauth-list-title">Authorised accounts</div>
-          {ADMIN_EMAILS.map(e=><div key={e} className="notauth-email">— {e}</div>)}
-        </div>
-        <button className="back-btn" onClick={onSignOut}>← Try a different account</button>
-      </div>
-    </div>
-  );
-}
-
-// ── Table Selector Modal ──
+// ─── TABLE MODAL ─────────────────────────────────────────────────────────────
 function TableModal({ onSelect, onClose }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal-box" onClick={e=>e.stopPropagation()}>
         <div className="modal-title">Select Table</div>
-        <p className="modal-sub">Tap your table number to begin. In production, scanning the QR code at your table sets this automatically.</p>
+        <p className="modal-sub">Tap your table number to start ordering.</p>
         <div className="table-grid">
           {TABLES.map(t=>(
             <div key={t} className="table-chip" onClick={()=>onSelect(t)}>
@@ -388,77 +455,121 @@ function Toast({ msg }) {
   return <div className="toast">{msg}</div>;
 }
 
-// ── Customer View ──
+// ─── STAR RATING POPUP ───────────────────────────────────────────────────────
+function RatingPopup({ order, onSubmit, onSkip }) {
+  const [ratings, setRatings] = useState({});
+  const [hovered, setHovered] = useState({});
+
+  const setItemRating = (id, s) => setRatings(r=>({...r,[id]:s}));
+
+  const handleSubmit = () => {
+    Object.entries(ratings).forEach(([id, s]) => saveRating(+id, s));
+    onSubmit();
+  };
+
+  return (
+    <div className="rating-overlay">
+      <div className="rating-box">
+        <div className="rating-title">How was your meal?</div>
+        <p className="rating-sub">Rate the items you ordered.</p>
+        <div className="rating-order-id">{order.id} · Table {order.table}</div>
+        <div className="rating-items">
+          {order.items.map(item=>{
+            const cur = ratings[item.id]||0;
+            const hov = hovered[item.id]||0;
+            const show = hov||cur;
+            return (
+              <div key={item.id} className="rating-item">
+                <span className="rating-item-name">{item.name}</span>
+                <div className="stars">
+                  {[1,2,3,4,5].map(s=>(
+                    <span key={s}
+                      className={`star ${show>=s?"lit":""}`}
+                      onMouseEnter={()=>setHovered(h=>({...h,[item.id]:s}))}
+                      onMouseLeave={()=>setHovered(h=>({...h,[item.id]:0}))}
+                      onClick={()=>setItemRating(item.id,s)}>★</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button className="rating-submit" onClick={handleSubmit}>Submit Ratings</button>
+        <button className="rating-skip" onClick={onSkip}>Skip</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── CUSTOMER VIEW ────────────────────────────────────────────────────────────
 function CustomerView({ orders, onPlaceOrder }) {
-  const [table, setTable]         = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [cart, setCart]           = useState({});
-  const [cat, setCat]             = useState("All");
-  const [confirmed, setConfirmed] = useState(null);
-  const [toast, setToast]         = useState("");
+  const [table, setTable]           = useState(null);
+  const [showModal, setShowModal]   = useState(false);
+  const [cart, setCart]             = useState({});
+  const [cat, setCat]               = useState("All");
+  const [confirmed, setConfirmed]   = useState(null);
+  const [toast, setToast]           = useState("");
+  const [showRating, setShowRating] = useState(false);
+  const [ratingDone, setRatingDone] = useState(false);
 
-  const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2000); };
+  const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""),2000); };
 
-  const cartItems = Object.entries(cart)
-    .map(([id,qty])=>({ ...MENU.find(m=>m.id===+id), qty }))
-    .filter(Boolean);
-  const total    = cartItems.reduce((s,i)=>s+i.price*i.qty, 0);
-  const totalQty = cartItems.reduce((s,i)=>s+i.qty, 0);
+  const cartItems = Object.entries(cart).map(([id,qty])=>({...MENU.find(m=>m.id===+id),qty})).filter(Boolean);
+  const total     = cartItems.reduce((s,i)=>s+i.price*i.qty,0);
+  const totalQty  = cartItems.reduce((s,i)=>s+i.qty,0);
 
-  const updateCart = (id, delta) =>
-    setCart(prev => {
+  const updateCart = (id,delta) =>
+    setCart(prev=>{
       const n={...prev}, nv=(n[id]||0)+delta;
       if(nv<=0) delete n[id]; else n[id]=nv;
       return n;
     });
 
   const filtered = MENU.filter(i=>cat==="All"||i.category===cat);
-  const grouped  = CATEGORIES.slice(1)
-    .map(c=>({ c, items:filtered.filter(i=>i.category===c) }))
-    .filter(g=>g.items.length);
+  const grouped  = CATEGORIES.slice(1).map(c=>({c,items:filtered.filter(i=>i.category===c)})).filter(g=>g.items.length);
 
   const handlePlace = () => {
     if (!table) { setShowModal(true); return; }
     if (!cartItems.length) return;
     const order = {
-      id: genId(),
-      table,
-      status: "Received",
-      timestamp: Date.now(),
-      total,
-      items: cartItems.map(i=>({ id:i.id, name:i.name, qty:i.qty, price:i.price })),
+      id:genId(), table, status:"Received",
+      timestamp:Date.now(), total,
+      items:cartItems.map(i=>({id:i.id,name:i.name,qty:i.qty,price:i.price})),
     };
     onPlaceOrder(order);
     setConfirmed(order);
     setCart({});
+    setRatingDone(false);
+    setShowRating(false);
   };
 
-  // Always pull the latest status from the shared store
-  const liveOrder  = confirmed ? (orders.find(o=>o.id===confirmed.id) || confirmed) : null;
+  // Always read latest status from the live shared orders list
+  const liveOrder  = confirmed ? (orders.find(o=>o.id===confirmed.id)||confirmed) : null;
   const liveStatus = liveOrder?.status || "Received";
   const statusIdx  = STATUS_FLOW.indexOf(liveStatus);
   const isReady    = liveStatus === "Ready";
 
-  // CONFIRMATION / LIVE STATUS PAGE
+  // Trigger rating popup once when order becomes Ready
+  useEffect(()=>{
+    if (isReady && confirmed && !ratingDone && !showRating) setShowRating(true);
+  },[isReady]);
+
+  const handleRatingDone = () => { setShowRating(false); setRatingDone(true); };
+
   if (confirmed) {
     return (
       <div className="menu-page">
         <div className="confirm-page pop-in">
-          {/* Icon changes when order is ready */}
-          <div className="confirm-seal">{isReady ? "✅" : "🎉"}</div>
-
-          <h2 className="confirm-title">
-            {isReady ? "Order Ready!" : "Order Placed"}
-          </h2>
+          <div className="confirm-seal">{isReady?"✅":"🎉"}</div>
+          <h2 className="confirm-title">{isReady?"Order Ready!":"Order Placed"}</h2>
           <p className="confirm-sub">
             {isReady
-              ? "Your order is ready. Please collect from the counter."
-              : "Your order has been sent to the kitchen.\nWe'll have it ready shortly."}
+              ? "Your order is ready — please collect from the counter."
+              : "Sent to the kitchen. We'll have it ready shortly."}
           </p>
-
           <div className="confirm-receipt">
             <div className="receipt-id">{confirmed.id}</div>
-            <div className="receipt-meta">Table {confirmed.table} &nbsp;·&nbsp; {confirmed.items.length} item{confirmed.items.length!==1?"s":""}</div>
+            <div className="receipt-meta">Table {confirmed.table} · {confirmed.items.length} item{confirmed.items.length!==1?"s":""}</div>
             <div className="receipt-datetime">Placed at {fmtDateTime(confirmed.timestamp)}</div>
             <div className="receipt-items">
               {confirmed.items.map(i=>(
@@ -472,7 +583,6 @@ function CustomerView({ orders, onPlaceOrder }) {
               <span className="lbl">Total</span>
               <span className="val">₹{confirmed.total}</span>
             </div>
-
             <div className="status-track-label">Live Status</div>
             <div className="status-track">
               {STATUS_FLOW.map((s,i)=>(
@@ -480,28 +590,25 @@ function CustomerView({ orders, onPlaceOrder }) {
               ))}
             </div>
           </div>
-
-          {/* "Order Fetched" banner — only shown when admin marks Ready */}
           {isReady && (
             <div className="ready-banner">
               <div className="ready-banner-icon">✅</div>
-              <div className="ready-banner-text">
+              <div>
                 <div className="ready-banner-title">Order Fetched!</div>
-                <div className="ready-banner-sub">The kitchen has marked your order as ready.<br/>Please collect from the counter.</div>
+                <div className="ready-banner-sub">Kitchen has marked your order ready.<br/>Please collect from the counter.</div>
               </div>
             </div>
           )}
-
-          <button className="more-btn" onClick={()=>{ setConfirmed(null); setTable(null); }}>
+          <button className="more-btn" onClick={()=>{setConfirmed(null);setTable(null);setRatingDone(false);}}>
             Place Another Order
           </button>
         </div>
+        {showRating && <RatingPopup order={confirmed} onSubmit={handleRatingDone} onSkip={handleRatingDone}/>}
         <Toast msg={toast}/>
       </div>
     );
   }
 
-  // MENU PAGE
   return (
     <>
       <div className="menu-page fade-up">
@@ -516,24 +623,22 @@ function CustomerView({ orders, onPlaceOrder }) {
           </div>
         ) : (
           <div className="table-prompt" onClick={()=>setShowModal(true)}>
-            <span style={{fontSize:20}}>🪑</span>
+            <span style={{fontSize:18}}>🪑</span>
             <span className="table-prompt-text">Select your table number</span>
             <span className="table-prompt-cta">Select →</span>
           </div>
         )}
-
         <div className="cat-strip">
           {CATEGORIES.map(c=>(
             <button key={c} className={`cat-pill ${cat===c?"on":""}`} onClick={()=>setCat(c)}>{c}</button>
           ))}
         </div>
-
         {grouped.map(({c,items})=>(
           <div key={c} className="menu-group">
             <div className="menu-group-label">{c}</div>
             <div className="menu-list">
               {items.map(item=>{
-                const qty = cart[item.id]||0;
+                const qty=cart[item.id]||0;
                 return (
                   <div key={item.id} className="menu-item">
                     <div className="menu-item-emoji">{item.emoji}</div>
@@ -547,10 +652,10 @@ function CustomerView({ orders, onPlaceOrder }) {
                         <>
                           <button className="item-btn" onClick={()=>updateCart(item.id,-1)}>−</button>
                           <span className="item-qty">{qty}</span>
-                          <button className="item-btn" onClick={()=>{ updateCart(item.id,1); showToast(`${item.name} added`); }}>+</button>
+                          <button className="item-btn" onClick={()=>{updateCart(item.id,1);showToast(`${item.name} added`);}}>+</button>
                         </>
                       ) : (
-                        <button className="item-add" onClick={()=>{ updateCart(item.id,1); showToast(`${item.name} added`); }}>Add</button>
+                        <button className="item-add" onClick={()=>{updateCart(item.id,1);showToast(`${item.name} added`);}}>Add</button>
                       )}
                     </div>
                   </div>
@@ -560,7 +665,6 @@ function CustomerView({ orders, onPlaceOrder }) {
           </div>
         ))}
       </div>
-
       {totalQty>0 && (
         <div className="cart-bar">
           <div className="cart-bar-row">
@@ -572,15 +676,67 @@ function CustomerView({ orders, onPlaceOrder }) {
           </button>
         </div>
       )}
-
-      {showModal && <TableModal onSelect={t=>{ setTable(t); setShowModal(false); }} onClose={()=>setShowModal(false)}/>}
+      {showModal && <TableModal onSelect={t=>{setTable(t);setShowModal(false);}} onClose={()=>setShowModal(false)}/>}
       <Toast msg={toast}/>
     </>
   );
 }
 
-// ── Admin View ──
-function AdminView({ orders, onUpdateStatus, onClearCompleted }) {
+// ─── ANALYTICS VIEW ───────────────────────────────────────────────────────────
+function AnalyticsView({ orders, ratings }) {
+  const countMap = {};
+  orders.forEach(o=>o.items.forEach(i=>{ countMap[i.id]=(countMap[i.id]||0)+i.qty; }));
+
+  const ranked = MENU
+    .map(item=>{
+      const count = countMap[item.id]||0;
+      const rs    = ratings[item.id]||[];
+      const avg   = rs.length ? (rs.reduce((s,r)=>s+r,0)/rs.length).toFixed(1) : null;
+      return {...item,count,avg,ratingCount:rs.length};
+    })
+    .filter(i=>i.count>0)
+    .sort((a,b)=>b.count-a.count);
+
+  const max = ranked[0]?.count||1;
+
+  if (!ranked.length) return (
+    <div className="analytics-empty">No orders yet. Data appears here once customers order.</div>
+  );
+
+  return (
+    <div className="fade-up">
+      <div className="analytics-section-title">Most Ordered Items</div>
+      <div className="analytics-list">
+        {ranked.map((item,idx)=>(
+          <div key={item.id} className="analytics-row">
+            <div className="analytics-rank">#{idx+1}</div>
+            <div className="analytics-emoji">{item.emoji}</div>
+            <div className="analytics-info">
+              <div className="analytics-name">{item.name}</div>
+              <div className="analytics-bar-wrap">
+                <div className="analytics-bar" style={{width:`${(item.count/max)*100}%`}}/>
+              </div>
+            </div>
+            <div className="analytics-right">
+              <div className="analytics-count">{item.count}</div>
+              <div className="analytics-count-label">ordered</div>
+              {item.avg && (
+                <div style={{display:"flex",alignItems:"center",gap:3,justifyContent:"flex-end",marginTop:3}}>
+                  <span className="analytics-stars">{"★".repeat(Math.round(+item.avg))}</span>
+                  <span className="analytics-rating-val">{item.avg} ({item.ratingCount})</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ADMIN VIEW ───────────────────────────────────────────────────────────────
+function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
+  const [tab, setTab]       = useState("orders");
   const [filter, setFilter] = useState("All");
 
   const filtered = filter==="All" ? orders : orders.filter(o=>o.status===filter);
@@ -590,36 +746,28 @@ function AdminView({ orders, onUpdateStatus, onClearCompleted }) {
     Preparing:orders.filter(o=>o.status==="Preparing").length,
     Ready:    orders.filter(o=>o.status==="Ready").length,
   };
-  const revenue = orders.reduce((s,o)=>s+o.total, 0);
+  const revenue = orders.reduce((s,o)=>s+o.total,0);
 
   return (
     <div className="admin-page fade-up">
-      {/* Header */}
       <div className="admin-top">
         <div>
           <div className="admin-heading">Kitchen Dashboard</div>
-          <div className="admin-date">
-            {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
-          </div>
+          <div className="admin-date">{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
           <div className="live-pill"><div className="live-dot"/>Live</div>
-          {counts.Ready>0 && (
-            <button className="clear-btn" onClick={onClearCompleted}>
-              Clear completed ({counts.Ready})
-            </button>
-          )}
+          {counts.Ready>0&&<button className="clear-btn" onClick={onClearCompleted}>Clear completed ({counts.Ready})</button>}
         </div>
       </div>
 
-      {/* KPI Strip */}
       <div className="kpi-strip">
         {[
-          {label:"Total Orders", val:counts.All,       color:"var(--gold2)"},
-          {label:"Received",     val:counts.Received,  color:"#C9A96E"},
-          {label:"Preparing",    val:counts.Preparing, color:"#7EB8F7"},
-          {label:"Ready",        val:counts.Ready,     color:"#7ECFA0"},
-          {label:"Revenue",      val:`₹${revenue}`,    color:"var(--ink)"},
+          {label:"Total",    val:counts.All,       color:"var(--accent)"},
+          {label:"Received", val:counts.Received,  color:"var(--blue)"},
+          {label:"Preparing",val:counts.Preparing, color:"var(--amber)"},
+          {label:"Ready",    val:counts.Ready,     color:"var(--green)"},
+          {label:"Revenue",  val:`₹${revenue}`,    color:"var(--text)"},
         ].map(({label,val,color})=>(
           <div key={label} className="kpi-card">
             <div className="kpi-val" style={{color}}>{val}</div>
@@ -628,120 +776,121 @@ function AdminView({ orders, onUpdateStatus, onClearCompleted }) {
         ))}
       </div>
 
-      {/* Filter tabs */}
-      <div className="filter-row">
-        {["All","Received","Preparing","Ready"].map(f=>(
-          <button key={f} className={`filter-btn ${filter===f?"on":""}`} onClick={()=>setFilter(f)}>
-            {f}{counts[f]>0?` · ${counts[f]}`:""}
-          </button>
-        ))}
+      <div className="admin-tabs">
+        <button className={`admin-tab ${tab==="orders"?"on":""}`} onClick={()=>setTab("orders")}>
+          Live Orders{counts.All>0?` · ${counts.All}`:""}
+        </button>
+        <button className={`admin-tab ${tab==="analytics"?"on":""}`} onClick={()=>setTab("analytics")}>
+          Analytics
+        </button>
       </div>
 
-      {/* Orders — only real orders placed by customers */}
-      {filtered.length===0 ? (
-        <div className="empty-admin">
-          <div className="empty-admin-icon">🍽</div>
-          <div className="empty-admin-title">
-            {filter==="All" ? "No orders yet" : `No ${filter.toLowerCase()} orders`}
+      {tab==="orders" && (
+        <>
+          <div className="filter-row">
+            {["All","Received","Preparing","Ready"].map(f=>(
+              <button key={f} className={`filter-btn ${filter===f?"on":""}`} onClick={()=>setFilter(f)}>
+                {f}{counts[f]>0?` · ${counts[f]}`:""}
+              </button>
+            ))}
           </div>
-          <div className="empty-admin-text">
-            {filter==="All"
-              ? "Orders placed by customers will appear here in real time."
-              : `Orders with status "${filter}" will appear here.`}
-          </div>
-        </div>
-      ) : (
-        <div className="orders-grid">
-          {[...filtered].sort((a,b)=>b.timestamp-a.timestamp).map(order=>(
-            <div key={order.id} className="order-tile fade-up">
-              {/* Coloured top accent bar */}
-              <div className="tile-accent" style={{background:STATUS_COLOR[order.status]}}/>
-
-              <div className="tile-body">
-                {/* Order header */}
-                <div className="tile-top">
-                  <div>
-                    <div className="tile-id">{order.id}</div>
-                    {/* Full date + time of when order was placed */}
-                    <div className="tile-meta">{fmtDateTime(order.timestamp)}</div>
-                  </div>
-                  <div className="tile-table-badge">Table {order.table}</div>
-                </div>
-
-                {/* Items list */}
-                <div className="tile-items">
-                  {order.items.map(i=>(
-                    <div key={i.id} className="tile-item">
-                      <span className="n">{i.name}</span>
-                      <span className="q">×{i.qty}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Total + status pill row */}
-                <div className="tile-footer">
-                  <div className="tile-total">Total: <strong>₹{order.total}</strong></div>
-                  <div style={{fontSize:10,letterSpacing:"0.1em",textTransform:"uppercase",color:STATUS_COLOR[order.status],fontWeight:600,border:`1px solid ${STATUS_COLOR[order.status]}44`,padding:"2px 8px",borderRadius:20,background:`${STATUS_COLOR[order.status]}11`}}>
-                    {order.status}
-                  </div>
-                </div>
-
-                {/* Status update buttons */}
-                <div className="status-btns">
-                  {STATUS_FLOW.map(s=>(
-                    <button
-                      key={s}
-                      className={`status-btn ${order.status===s?`active-${s}`:""}`}
-                      onClick={()=>onUpdateStatus(order.id, s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-
-                {/* "Order Fetched ✓" button — marks Ready AND notifies customer */}
-                <button
-                  className={`mark-ready-btn ${order.status==="Ready"?"is-ready":""}`}
-                  onClick={()=>order.status!=="Ready" && onUpdateStatus(order.id,"Ready")}
-                >
-                  {order.status==="Ready" ? (
-                    <><span className="checkmark">✓</span> Order Fetched</>
-                  ) : (
-                    <><span className="checkmark">✓</span> Mark as Ready &amp; Notify Customer</>
-                  )}
-                </button>
-              </div>
+          {filtered.length===0 ? (
+            <div className="empty-admin">
+              <div className="empty-admin-icon">🍽</div>
+              <div className="empty-admin-title">{filter==="All"?"No orders yet":`No ${filter.toLowerCase()} orders`}</div>
+              <div className="empty-admin-text">{filter==="All"?"Customer orders appear here in real time.":""}</div>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="orders-grid">
+              {[...filtered].sort((a,b)=>b.timestamp-a.timestamp).map(order=>(
+                <div key={order.id} className="order-tile fade-up">
+                  <div className="tile-accent" style={{background:STATUS_COLOR[order.status]}}/>
+                  <div className="tile-body">
+                    <div className="tile-top">
+                      <div>
+                        <div className="tile-id">{order.id}</div>
+                        <div className="tile-meta">{fmtDateTime(order.timestamp)}</div>
+                      </div>
+                      <div className="tile-table-badge">Table {order.table}</div>
+                    </div>
+                    <div className="tile-items">
+                      {order.items.map(i=>(
+                        <div key={i.id} className="tile-item">
+                          <span className="n">{i.name}</span>
+                          <span className="q">×{i.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="tile-footer">
+                      <div className="tile-total">Total: <strong>₹{order.total}</strong></div>
+                      <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:STATUS_COLOR[order.status],fontWeight:600,border:`1px solid ${STATUS_COLOR[order.status]}44`,padding:"2px 8px",borderRadius:20}}>
+                        {order.status}
+                      </div>
+                    </div>
+                    <div className="status-btns">
+                      {STATUS_FLOW.map(s=>(
+                        <button key={s}
+                          className={`status-btn ${order.status===s?`sb-active-${s}`:""}`}
+                          onClick={()=>onUpdateStatus(order.id,s)}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      className={`mark-ready-btn ${order.status==="Ready"?"is-ready":""}`}
+                      onClick={()=>order.status!=="Ready"&&onUpdateStatus(order.id,"Ready")}
+                    >
+                      {order.status==="Ready" ? <>✓ Order Fetched</> : <>✓ Mark Ready &amp; Notify</>}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
+
+      {tab==="analytics" && <AnalyticsView orders={orders} ratings={ratings}/>}
     </div>
   );
 }
 
-// ── Root App ──
+// ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [auth,    setAuth]    = useState(null);
-  const [notAuth, setNotAuth] = useState(null);
+  // Restore auth from localStorage on page load — this fixes the refresh logout issue
+  const [auth,    setAuth]    = useState(() => loadAuth());
   const [orders,  setOrders]  = useState([]);
+  const [ratings, setRatings] = useState({});
 
-  // Subscribe to the shared in-memory store
-  useEffect(()=>subscribeOrders(setOrders), []);
+  // Subscribe to shared store (works across tabs via storage events)
+  useEffect(() => {
+    return subscribeStore(({ orders, ratings }) => {
+      setOrders(orders);
+      setRatings(ratings);
+    });
+  }, []);
 
-  const handleGuest  = () => setAuth({ role:"guest", name:"Guest", email:null, picture:null });
+  const handleGuest = () => {
+    const a = { role:"guest", name:"Guest", email:null, picture:null };
+    persistAuth(a);
+    setAuth(a);
+  };
+
   const handleGoogle = (user) => {
     const isAdmin = ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(user.email.toLowerCase());
-    setAuth({ role: isAdmin ? "admin" : "customer", ...user });
-    setNotAuth(null);
-  };
-  const handleSignOut = () => {
-    window.google?.accounts?.id?.disableAutoSelect?.();
-    setAuth(null); setNotAuth(null);
+    const a = { role: isAdmin ? "admin" : "customer", ...user };
+    persistAuth(a);
+    setAuth(a);
   };
 
-  // Only real orders from customers flow through here — no sample data
-  const handlePlaceOrder     = (o)    => saveOrders([o, ...orders]);
-  const handleUpdateStatus   = (id,s) => saveOrders(orders.map(o=>o.id===id ? {...o, status:s} : o));
+  const handleSignOut = () => {
+    window.google?.accounts?.id?.disableAutoSelect?.();
+    persistAuth(null);
+    setAuth(null);
+  };
+
+  const handlePlaceOrder     = (o)    => saveOrders([o,...orders]);
+  const handleUpdateStatus   = (id,s) => saveOrders(orders.map(o=>o.id===id?{...o,status:s}:o));
   const handleClearCompleted = ()     => saveOrders(orders.filter(o=>o.status!=="Ready"));
 
   const isAdmin = auth?.role === "admin";
@@ -750,36 +899,31 @@ export default function App() {
     <>
       <style>{css}</style>
 
-      {!auth && !notAuth && <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle}/>}
-      {null}
+      {!auth && <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle}/>}
 
       {auth && (
-        <div style={{minHeight:"100vh", background:"var(--paper)"}}>
+        <div style={{minHeight:"100vh",background:"var(--bg)"}}>
           <nav className="top-nav">
             <div className="nav-brand">Bistro<em>Spice</em></div>
             <div className="nav-right">
-              <span className={`nav-role ${isAdmin?"admin":"guest"}`}>
-                {isAdmin ? "Admin" : "Guest"}
-              </span>
+              <span className={`nav-role ${auth.role}`}>{auth.role}</span>
               {auth.picture ? (
                 <div className="nav-user">
                   <img className="nav-avatar" src={auth.picture} alt={auth.name} referrerPolicy="no-referrer"/>
                   <span className="nav-name">{auth.name}</span>
                 </div>
-              ) : auth.name !== "Guest" ? (
+              ) : auth.name && auth.name!=="Guest" ? (
                 <div className="nav-user">
-                  <div className="nav-avatar-init">{auth.name?.[0]}</div>
+                  <div className="nav-avatar-init">{auth.name[0]}</div>
                   <span className="nav-name">{auth.name}</span>
                 </div>
               ) : null}
-              <button className="nav-signout" onClick={handleSignOut}>
-                {isAdmin ? "Sign out" : "← Back"}
-              </button>
+              <button className="nav-signout" onClick={handleSignOut}>Sign out</button>
             </div>
           </nav>
 
           {isAdmin
-            ? <AdminView orders={orders} onUpdateStatus={handleUpdateStatus} onClearCompleted={handleClearCompleted}/>
+            ? <AdminView orders={orders} ratings={ratings} onUpdateStatus={handleUpdateStatus} onClearCompleted={handleClearCompleted}/>
             : <CustomerView orders={orders} onPlaceOrder={handlePlaceOrder}/>
           }
         </div>

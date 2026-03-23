@@ -751,7 +751,7 @@ export default function App() {
       <style>{css}</style>
 
       {!auth && !notAuth && <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle}/>}
-      {!auth && notAuth  && <NotAuthorisedScreen user={notAuth} onSignOut={handleSignOut}/>}
+      {null}
 
       {auth && (
         <div style={{minHeight:"100vh", background:"var(--paper)"}}>

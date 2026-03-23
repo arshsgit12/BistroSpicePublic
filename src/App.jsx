@@ -32,16 +32,16 @@ function genId() { return "ORD-" + Math.random().toString(36).slice(2,6).toUpper
 // Orders stored in sessionStorage so they survive page refresh within the tab
 // Auth stored in localStorage so login persists across refreshes
 function loadOrders() {
-  try { return JSON.parse(sessionStorage.getItem("bs_orders") || "[]"); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem("bs_orders") || "[]"); } catch { return []; }
 }
 function persistOrders(orders) {
-  try { sessionStorage.setItem("bs_orders", JSON.stringify(orders)); } catch {}
+  try { localStorage.setItem("bs_orders", JSON.stringify(orders)); } catch {}
 }
 function loadRatings() {
-  try { return JSON.parse(sessionStorage.getItem("bs_ratings") || "{}"); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem("bs_ratings") || "{}"); } catch { return {}; }
 }
 function persistRatings(ratings) {
-  try { sessionStorage.setItem("bs_ratings", JSON.stringify(ratings)); } catch {}
+  try { localStorage.setItem("bs_ratings", JSON.stringify(ratings)); } catch {}
 }
 function loadAuth() {
   try { return JSON.parse(localStorage.getItem("bs_auth") || "null"); } catch { return null; }

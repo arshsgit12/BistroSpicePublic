@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const GOOGLE_CLIENT_ID = "1031994809087-ribigpmso5umf5bt4f1eofdj4vor2rk4.apps.googleusercontent.com";
-const ADMIN_EMAILS = ["pythonwitharsh@gmail.com"];
+const ADMIN_EMAILS = ["thestdychannelonly@gmail.com", "pythonwitharsh@gmail.com"];
 
 const MENU = [
   { id:1,  category:"Starters",  name:"Paneer Tikka",         price:220, emoji:"🧀", desc:"Marinated cottage cheese, tandoor-grilled" },

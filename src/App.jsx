@@ -209,6 +209,37 @@ const css = `
   .cart-place { width:100%; padding:13px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; letter-spacing:0.04em; transition:background 0.2s,transform 0.1s; }
   .cart-place:hover { background:var(--accent2); color:#fff; }
   .cart-place:active { transform:scale(0.99); }
+  .live-insights { margin:18px 14px 0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .insight-card { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; min-width:0; }
+  .insight-label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
+  .insight-value { font-family:'DM Serif Display',serif; font-size:24px; color:var(--accent); line-height:1; }
+  .insight-sub { font-size:11px; color:var(--text3); margin-top:6px; line-height:1.5; }
+  .live-panel { margin:18px 14px 0; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+  .live-panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line2); }
+  .live-panel-title { font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text2); }
+  .live-panel-status { font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--green); display:flex; align-items:center; gap:6px; }
+  .live-panel-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 0 0 rgba(52,211,153,0.45); animation:pulseRing 1.7s infinite; }
+  @keyframes pulseRing { 0% { box-shadow:0 0 0 0 rgba(52,211,153,0.45); } 70% { box-shadow:0 0 0 8px rgba(52,211,153,0); } 100% { box-shadow:0 0 0 0 rgba(52,211,153,0); } }
+  .live-panel-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+  .live-order-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--line2); }
+  .live-order-row:last-child { padding-bottom:0; border-bottom:none; }
+  .live-order-main { min-width:0; }
+  .live-order-id { font-size:13px; color:var(--text); font-weight:600; margin-bottom:4px; }
+  .live-order-meta { font-size:11px; color:var(--text3); }
+  .live-order-badge { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; padding:4px 10px; border-radius:20px; border:1px solid; white-space:nowrap; }
+  .live-order-badge.Received { color:var(--blue); border-color:rgba(96,165,250,0.35); background:rgba(96,165,250,0.08); }
+  .live-order-badge.Preparing { color:var(--amber); border-color:rgba(245,158,11,0.35); background:rgba(245,158,11,0.08); }
+  .live-order-badge.Ready { color:var(--green); border-color:rgba(52,211,153,0.35); background:rgba(52,211,153,0.08); }
+  .live-empty { padding:8px 0 2px; font-size:12px; color:var(--text3); line-height:1.7; }
+  .timeline { margin-top:16px; background:var(--bg3); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; }
+  .timeline-title { font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text3); margin-bottom:10px; }
+  .timeline-list { display:flex; flex-direction:column; gap:10px; }
+  .timeline-row { display:flex; align-items:flex-start; gap:10px; }
+  .timeline-dot { width:9px; height:9px; border-radius:50%; margin-top:4px; flex-shrink:0; background:var(--bg4); border:1px solid var(--line); }
+  .timeline-dot.active { background:var(--accent); border-color:transparent; }
+  .timeline-content { min-width:0; }
+  .timeline-label { font-size:12px; color:var(--text2); }
+  .timeline-meta { font-size:10px; color:var(--text3); margin-top:3px; line-height:1.5; }
 
   /* ── CONFIRM PAGE ── */
   .confirm-page { max-width:500px; margin:0 auto; padding:48px 20px 40px; display:flex; flex-direction:column; align-items:center; text-align:center; }
@@ -502,7 +533,7 @@ function RatingPopup({ order, onSubmit, onSkip }) {
 }
 
 // ─── CUSTOMER VIEW ────────────────────────────────────────────────────────────
-function CustomerView({ orders, onPlaceOrder }) {
+function CustomerView({ orders, ratings, onPlaceOrder }) {
   const [table, setTable]           = useState(null);
   const [showModal, setShowModal]   = useState(false);
   const [cart, setCart]             = useState({});
@@ -527,6 +558,31 @@ function CustomerView({ orders, onPlaceOrder }) {
 
   const filtered = MENU.filter(i=>cat==="All"||i.category===cat);
   const grouped  = CATEGORIES.slice(1).map(c=>({c,items:filtered.filter(i=>i.category===c)})).filter(g=>g.items.length);
+  const activeOrders = orders.filter(o=>o.status!=="Ready");
+  const popularItem = MENU
+    .map(item => ({
+      ...item,
+      count: orders.reduce((sum, order) => {
+        const ordered = order.items.find(orderItem => orderItem.id === item.id);
+        return sum + (ordered ? ordered.qty : 0);
+      }, 0),
+    }))
+    .sort((a, b) => b.count - a.count)[0];
+  const topRatedItem = MENU
+    .map(item => {
+      const itemRatings = ratings[item.id] || [];
+      const avg = itemRatings.length
+        ? itemRatings.reduce((sum, value) => sum + value, 0) / itemRatings.length
+        : 0;
+      return { ...item, avg, count: itemRatings.length };
+    })
+    .filter(item => item.count > 0)
+    .sort((a, b) => b.avg - a.avg || b.count - a.count)[0];
+  const liveTimeline = [
+    { key:"received", label:"Order received instantly", meta:"Orders appear on the kitchen dashboard the moment you place them." },
+    { key:"preparing", label:"Kitchen updates in real time", meta:"Staff can switch an order from received to preparing to ready." },
+    { key:"ready", label:"Pickup notification state", meta:"Your receipt automatically turns green when the order is marked ready." },
+  ];
 
   const handlePlace = () => {
     if (!table) { setShowModal(true); return; }
@@ -628,6 +684,74 @@ function CustomerView({ orders, onPlaceOrder }) {
             <span className="table-prompt-cta">Select →</span>
           </div>
         )}
+        <div className="live-insights">
+          <div className="insight-card">
+            <div className="insight-label">Live orders</div>
+            <div className="insight-value">{activeOrders.length}</div>
+            <div className="insight-sub">Orders currently active across the restaurant.</div>
+          </div>
+          <div className="insight-card">
+            <div className="insight-label">Trending dish</div>
+            <div className="insight-value">{popularItem?.emoji || "🍽"}</div>
+            <div className="insight-sub">
+              {popularItem?.count
+                ? `${popularItem.name} has been ordered ${popularItem.count} time${popularItem.count !== 1 ? "s" : ""}.`
+                : "Place the first order to see the live trend."}
+            </div>
+          </div>
+        </div>
+
+        <div className="live-panel">
+          <div className="live-panel-head">
+            <div className="live-panel-title">Restaurant activity</div>
+            <div className="live-panel-status">Synced live</div>
+          </div>
+          <div className="live-panel-body">
+            {orders.length ? (
+              [...orders]
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, 3)
+                .map(order => (
+                  <div key={order.id} className="live-order-row">
+                    <div className="live-order-main">
+                      <div className="live-order-id">{order.id}</div>
+                      <div className="live-order-meta">
+                        Table {order.table} · {order.items.reduce((sum, item) => sum + item.qty, 0)} item{order.items.reduce((sum, item) => sum + item.qty, 0) !== 1 ? "s" : ""} · {fmtDateTime(order.timestamp)}
+                      </div>
+                    </div>
+                    <div className={`live-order-badge ${order.status}`}>{order.status}</div>
+                  </div>
+                ))
+            ) : (
+              <div className="live-empty">No live orders yet. The activity feed updates automatically when anyone places an order.</div>
+            )}
+
+            <div className="timeline">
+              <div className="timeline-title">How the live flow works</div>
+              <div className="timeline-list">
+                {liveTimeline.map((step, index) => (
+                  <div key={step.key} className="timeline-row">
+                    <div className={`timeline-dot ${confirmed ? (index <= statusIdx ? "active" : "") : index === 0 ? "active" : ""}`}></div>
+                    <div className="timeline-content">
+                      <div className="timeline-label">{step.label}</div>
+                      <div className="timeline-meta">{step.meta}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="insight-card" style={{padding:"12px 14px"}}>
+              <div className="insight-label">Guest favorite</div>
+              <div className="insight-sub" style={{marginTop:0}}>
+                {topRatedItem
+                  ? `${topRatedItem.name} is rated ${topRatedItem.avg.toFixed(1)}/5 from ${topRatedItem.count} review${topRatedItem.count !== 1 ? "s" : ""}.`
+                  : "Ratings appear here once a ready order is reviewed."}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="cat-strip">
           {CATEGORIES.map(c=>(
             <button key={c} className={`cat-pill ${cat===c?"on":""}`} onClick={()=>setCat(c)}>{c}</button>
@@ -646,6 +770,14 @@ function CustomerView({ orders, onPlaceOrder }) {
                       <div className="menu-item-name">{item.name}</div>
                       <div className="menu-item-desc">{item.desc}</div>
                       <div className="menu-item-price">₹{item.price}</div>
+                      {!!(ratings[item.id]?.length) && (
+                        <div className="menu-item-desc" style={{marginTop:5, whiteSpace:"normal"}}>
+                          {"★".repeat(Math.round((ratings[item.id].reduce((sum, value) => sum + value, 0) / ratings[item.id].length) || 0))}{" "}
+                          {(
+                            ratings[item.id].reduce((sum, value) => sum + value, 0) / ratings[item.id].length
+                          ).toFixed(1)} · {ratings[item.id].length} review{ratings[item.id].length !== 1 ? "s" : ""}
+                        </div>
+                      )}
                     </div>
                     <div className="item-ctrl">
                       {qty>0 ? (
@@ -924,7 +1056,7 @@ export default function App() {
 
           {isAdmin
             ? <AdminView orders={orders} ratings={ratings} onUpdateStatus={handleUpdateStatus} onClearCompleted={handleClearCompleted}/>
-            : <CustomerView orders={orders} onPlaceOrder={handlePlaceOrder}/>
+            : <CustomerView orders={orders} ratings={ratings} onPlaceOrder={handlePlaceOrder}/>
           }
         </div>
       )}

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BistroSpice - Restaurant Ordering System</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0f0e0c; --surface: #1a1916; --surface2: #252320; --border: #2e2c28;
+            --accent: #f5a623; --accent2: #e8834a; --text: #f0ede8; --text2: #9a958c;
+            --green: #22c55e; --blue: #3b82f6; --red: #ef4444; --r: 12px;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            padding: 20px;
+        }
+
+        /* AUTH STYLES */
+        .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(245,166,35,.1) 0%, transparent 65%), var(--bg); }
+        .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,.5); }
+        .auth-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 30px; color: var(--accent); letter-spacing: -1px; margin-bottom: 6px; }
+        .auth-logo span { color: var(--text); }
+        .auth-tagline { font-size: 14px; color: var(--text2); margin-bottom: 32px; line-height: 1.6; }
+        .guest-btn { width: 100%; padding: 14px; border-radius: var(--r); border: none; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0f0e0c; font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; transition: opacity .15s; margin-bottom: 10px; }
+        .guest-btn:hover { opacity: .88; }
+        .auth-hint { font-size: 12px; color: var(--text2); margin-bottom: 0; }
+        .auth-divider { display: flex; align-items: center; gap: 12px; margin: 24px 0; }
+        .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+        .auth-divider span { font-size: 12px; color: var(--text2); white-space: nowrap; font-weight: 500; }
+        .google-btn { width: 100%; padding: 13px 20px; border-radius: var(--r); border: 1.5px solid var(--border); background: var(--surface2); color: var(--text); font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all .2s; }
+        .google-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(245,166,35,.06); }
+        .google-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .auth-note { font-size: 12px; color: var(--text2); margin-top: 18px; line-height: 1.6; }
+        .error-box { margin-top: 12px; font-size: 13px; color: var(--red); background: rgba(239,68,68,.08); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(239,68,68,.2); }
+
+        /* NOT AUTH STYLES */
+        .notauth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px 32px; max-width: 420px; width: 100%; text-align: center; }
+        .admin-list { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 16px 0 24px; text-align: left; font-size: 13px; color: var(--text2); }
+        .admin-list-title { font-weight: 600; color: var(--text); margin-bottom: 6px; font-size: 13px; }
+
+        /* TOP NAV STYLES */
+        .top-nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; gap: 10px; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: var(--accent); letter-spacing: -.5px; flex-shrink: 0; }
+        .logo span { color: var(--text); }
+        .nav-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .role-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+        .role-admin { background: rgba(245,166,35,.15); color: var(--accent); border: 1px solid rgba(245,166,35,.3); }
+        .role-guest { background: rgba(59,130,246,.12); color: var(--blue); border: 1px solid rgba(59,130,246,.25); }
+        .user-chip { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); font-size: 13px; color: var(--text2); min-width: 0; max-width: 160px; }
+        .user-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+        .user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sign-out-btn { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-size: 12px; font-weight: 600; transition: all .18s; white-space: nowrap; flex-shrink: 0; }
+        .sign-out-btn:hover { border-color: var(--red); color: var(--red); }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .tagline {
+            font-size: 16px;
+            color: var(--text2);
+            margin-bottom: 30px;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .menu-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+        .menu-item:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        .item-emoji { font-size: 24px; margin-bottom: 8px; }
+        .item-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .item-desc {
+            color: var(--text2);
+            font-size: 14px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        .item-price {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .item-category {
+            color: var(--text2);
+            font-size: 12px;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .demo-btn {
+            background: var(--accent);
+            color: #0f0e0c;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: opacity 0.2s;
+        }
+        .demo-btn:hover { opacity: 0.9; }
+        .orders-list {
+            margin-top: 40px;
+        }
+        .order-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .order-id {
+            font-weight: bold;
+            color: var(--accent);
+        }
+        .order-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-received { background: var(--accent); color: #0f0e0c; }
+        .status-preparing { background: var(--blue); color: white; }
+        .status-ready { background: var(--green); color: white; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Config
+        const GOOGLE_CLIENT_ID = "1031994809087-ribigpmso5umf5bt4f1eofdj4vor2rk4.apps.googleusercontent.com";
+        const ADMIN_EMAILS = ["thestdychannelonly@gmail.com", "pythonwitharsh@gmail.com"];
+
+        // Menu data
+        const MENU = [
+            { id: 1, category: "Starters", name: "Paneer Tikka", price: 220, emoji: "🧀", desc: "Marinated cottage cheese, tandoor-grilled" },
+            { id: 2, category: "Starters", name: "Veg Spring Rolls", price: 160, emoji: "🥢", desc: "Crispy rolls with mixed veggies" },
+            { id: 3, category: "Starters", name: "Chicken Wings", price: 280, emoji: "🍗", desc: "Spiced, smoky, served with dip" },
+            { id: 4, category: "Mains", name: "Dal Makhani", price: 240, emoji: "🍲", desc: "Slow-cooked black lentils, butter & cream" },
+            { id: 5, category: "Mains", name: "Butter Chicken", price: 320, emoji: "🍛", desc: "Classic tomato-cream curry" },
+            { id: 6, category: "Mains", name: "Paneer Butter Masala", price: 290, emoji: "🫕", desc: "Cottage cheese in rich gravy" },
+            { id: 7, category: "Mains", name: "Chicken Biryani", price: 360, emoji: "🍚", desc: "Fragrant basmati, slow-dum cooked" },
+            { id: 8, category: "Breads", name: "Butter Naan", price: 50, emoji: "🫓", desc: "Soft tandoor-baked bread" },
+            { id: 9, category: "Breads", name: "Garlic Roti", price: 45, emoji: "🥙", desc: "Whole wheat, garlic butter" },
+            { id: 10, category: "Breads", name: "Paratha", price: 60, emoji: "🥞", desc: "Layered, flaky whole wheat" },
+            { id: 11, category: "Drinks", name: "Mango Lassi", price: 90, emoji: "🥭", desc: "Thick, sweet, chilled" },
+            { id: 12, category: "Drinks", name: "Masala Chai", price: 40, emoji: "☕", desc: "Spiced milk tea" },
+            { id: 13, category: "Drinks", name: "Fresh Lime Soda", price: 70, emoji: "🍋", desc: "Sweet or salted, your choice" },
+            { id: 14, category: "Desserts", name: "Gulab Jamun", price: 80, emoji: "🟤", desc: "Warm, syrup-soaked dumplings" },
+            { id: 15, category: "Desserts", name: "Kulfi", price: 100, emoji: "🍦", desc: "Traditional Indian ice cream" },
+        ];
+
+        // Auth Screen Component
+        function AuthScreen({ onGuest, onGoogle }) {
+            const [ready, setReady] = useState(true);
+            const [error, setError] = useState("");
+
+            const handleGoogle = () => {
+                setError("");
+                // Simulate Google OAuth - in real app this would use Google Identity Services
+                alert('Google OAuth not implemented in this demo. Use Guest mode instead.');
+            };
+
+            return (
+                <div className="auth-screen">
+                    <div className="auth-card">
+                        <div className="auth-logo">Bistro<span>Spice</span></div>
+                        <p className="auth-tagline">Fast table ordering for dine-in restaurants.<br />No waiting, no confusion.</p>
+
+                        <button className="guest-btn" onClick={onGuest}>🍽 Browse Menu &amp; Order</button>
+                        <p className="auth-hint">Customers — tap above. No sign-in needed.</p>
+
+                        <div className="auth-divider"><span>Restaurant Staff</span></div>
+
+                        <button className="google-btn" onClick={handleGoogle} disabled={!ready}>
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+                                <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+                                <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
+                                <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
+                            </svg>
+                            {ready ? "Sign in with Google" : "Loading…"}
+                        </button>
+
+                        {error && <div className="error-box">⚠️ {error}</div>}
+
+                        <p className="auth-note">Admin sign-in requires an authorised Google account.<br />Contact your restaurant manager for access.</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // Not Authorised Screen Component
+        function NotAuthorisedScreen({ user, onSignOut }) {
+            return (
+                <div className="auth-screen">
+                    <div className="notauth-card">
+                        <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+                        <div style={{ fontFamily: "Syne,sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 8 }}>Not Authorised</div>
+                        <p style={{ color: "var(--text2)", fontSize: 14, lineHeight: 1.6 }}>
+                            <strong style={{ color: "var(--text)" }}>{user.email}</strong> is not on the admin list.
+                            Ask your restaurant owner to add your email.
+                        </p>
+                        <div className="admin-list">
+                            <div className="admin-list-title">Current admin emails:</div>
+                            {ADMIN_EMAILS.map(e => <div key={e} style={{ fontFamily: "monospace", fontSize: 12, marginTop: 3 }}>• {e}</div>)}
+                        </div>
+                        <button className="sign-out-btn" style={{ width: "100%", padding: 12, fontSize: 14 }} onClick={onSignOut}>
+                            Sign Out &amp; Try Another Account
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [auth, setAuth] = useState(null); // null | { role, name, email, picture }
+            const [notAuth, setNotAuth] = useState(null); // google user that isn't an admin
+            const [orders, setOrders] = useState([]);
+
+            const handleGuest = () => setAuth({ role: "guest", name: "Guest", email: null, picture: null });
+            const handleGoogle = () => {
+                // Simulate Google OAuth - in real app this would authenticate with Google
+                const mockUser = { email: "user@example.com", name: "John Doe", picture: null };
+                if (ADMIN_EMAILS.includes(mockUser.email)) {
+                    setAuth({ role: "admin", ...mockUser });
+                } else {
+                    setNotAuth(mockUser);
+                }
+            };
+
+            const addDemoOrder = () => {
+                const randomItem = MENU[Math.floor(Math.random() * MENU.length)];
+                const newOrder = {
+                    id: "ORD-" + Math.random().toString(36).slice(2, 6).toUpperCase(),
+                    table: Math.floor(Math.random() * 10) + 1,
+                    items: [randomItem],
+                    status: "Received",
+                    timestamp: new Date().toISOString()
+                };
+                setOrders(prev => [...prev, newOrder]);
+            };
+
+            const updateOrderStatus = (orderId, newStatus) => {
+                setOrders(prev => prev.map(order =>
+                    order.id === orderId ? { ...order, status: newStatus } : order
+                ));
+            };
+
+            // Show auth screen if not authenticated
+            if (!auth) {
+                return <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle} />;
+            }
+
+            // Show not authorised screen if user tried to sign in but isn't admin
+            if (notAuth) {
+                return <NotAuthorisedScreen user={notAuth} onSignOut={() => { setNotAuth(null); setAuth(null); }} />;
+            }
+
+            // Main app content
+            return (
+                <div>
+                    {/* Top Navigation */}
+                    <div className="top-nav">
+                        <div className="logo">Bistro<span>Spice</span></div>
+                        <div className="nav-right">
+                            <div className={`role-badge ${auth.role === 'admin' ? 'role-admin' : 'role-guest'}`}>
+                                {auth.role === 'admin' ? '👑' : '👤'} {auth.role}
+                            </div>
+                            {auth.email && (
+                                <div className="user-chip">
+                                    {auth.picture && <img className="user-avatar" src={auth.picture} alt="Avatar" />}
+                                    <span className="user-name">{auth.name}</span>
+                                </div>
+                            )}
+                            <button className="sign-out-btn" onClick={() => { setAuth(null); setNotAuth(null); }}>
+                                Sign Out
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div style={{padding: '20px'}}>
+                        <div className="container">
+                            <div className="header">
+                                <div className="tagline">Welcome to BistroSpice! Browse our menu and place your order.</div>
+                                <button className="demo-btn" onClick={addDemoOrder}>
+                                    🍽️ Add Demo Order
+                                </button>
+                            </div>
+
+                            <div className="menu-grid">
+                                {MENU.slice(0, 8).map(item => (
+                                    <div key={item.id} className="menu-item">
+                                        <div className="item-emoji">{item.emoji}</div>
+                                        <div className="item-name">{item.name}</div>
+                                        <div className="item-desc">{item.desc}</div>
+                                        <div className="item-price">₹{item.price}</div>
+                                        <div className="item-category">{item.category}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {orders.length > 0 && (
+                                <div className="orders-list">
+                                    <h2 style={{ color: 'var(--text)', marginBottom: '20px' }}>Recent Orders</h2>
+                                    {orders.map(order => (
+                                        <div key={order.id} className="order-item">
+                                            <div className="order-header">
+                                                <span className="order-id">{order.id}</span>
+                                                <span className={`order-status ${order.status.toLowerCase()}`}>
+                                                    {order.status === 'Received' ? '📋' :
+                                                     order.status === 'Preparing' ? '👨‍🍳' : '✅'} {order.status}
+                                                </span>
+                                            </div>
+                                            <div style={{ color: 'var(--text2)', fontSize: '14px' }}>
+                                                Table {order.table} • {order.items.length} item(s) • {order.items[0].name}
+                                            </div>
+                                            <select
+                                                value={order.status}
+                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                style={{
+                                                    marginTop: '8px',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid var(--border)',
+                                                    background: 'var(--surface2)',
+                                                    color: 'var(--text)',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                <option value="Received">📋 Received</option>
+                                                <option value="Preparing">👨‍🍳 Preparing</option>
+                                                <option value="Ready">✅ Ready</option>
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

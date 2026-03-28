@@ -859,10 +859,27 @@ function PaymentModal({ total, onPaymentComplete, onClose }) {
 }
 
 // ─── AUTH SCREEN ─────────────────────────────────────────────────────────────
-function AuthScreen({ onGuest, onGoogle }) {
+// Replace the AuthScreen component with this:
+
+function AuthScreen({ onGoogle }) {
   const { ready, signIn } = useGIS();
   const [error, setError] = useState("");
-  const go = () => { setError(""); signIn(onGoogle, setError); };
+  const [loading, setLoading] = useState(false);
+
+  const handleGoogleSignIn = () => {
+    setError("");
+    setLoading(true);
+    signIn(
+      (user) => {
+        setLoading(false);
+        onGoogle(user);
+      },
+      (err) => {
+        setLoading(false);
+        setError(err || "Sign-in failed. Please try again.");
+      }
+    );
+  };
 
   return (
     <div className="auth-wrap">
@@ -871,25 +888,67 @@ function AuthScreen({ onGuest, onGoogle }) {
           <div className="auth-brand-name">Bistro<em>Spice</em></div>
           <div className="auth-tagline">Table Ordering System</div>
         </div>
-        <button className="auth-cta" onClick={onGuest} aria-label="Continue as guest">Browse Menu & Order</button>
-        <p className="auth-cta-sub">Continue as guest — no sign-in needed</p>
-        <div className="auth-divider"><span>Or sign in</span></div>
-        <div id="g-btn-slot" style={{display:"flex", justifyContent:"center", minHeight:44, marginBottom:8}} />
-        <button className="google-btn" onClick={go} disabled={!ready} aria-label="Sign in with Google">
-          <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-            <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-            <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-            <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
-            <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
-          </svg>
-          {ready ? "Sign in with Google" : "Loading…"}
+
+        <p className="auth-note" style={{ marginBottom: "24px", lineHeight: 1.8 }}>
+          Sign in to order food at your table.<br/>
+          Your order history and rewards will be saved.
+        </p>
+
+        <div id="g-btn-slot" style={{ display: "flex", justifyContent: "center", minHeight: 44, marginBottom: 12 }} />
+
+        <button
+          className="google-btn"
+          onClick={handleGoogleSignIn}
+          disabled={!ready || loading}
+          aria-label="Sign in with Google"
+        >
+          {loading ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                width: 16,
+                height: 16,
+                border: "2px solid var(--text3)",
+                borderTopColor: "var(--accent)",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite"
+              }} />
+              Signing in...
+            </span>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+                <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+                <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
+                <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
+              </svg>
+              {ready ? "Continue with Google" : "Loading…"}
+            </>
+          )}
         </button>
-        {error && <div className="auth-error" role="alert">{error}</div>}
-        <p className="auth-note">Admin staff sign in with their authorised Google account.<br/>Everyone else gets the menu directly.</p>
+
+        {error && (
+          <div className="auth-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <p className="auth-note" style={{ marginTop: "18px" }}>
+          Admin accounts are automatically recognized.<br/>
+          Contact the manager if you need access.
+        </p>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
+
 
 // ─── TABLE MODAL ─────────────────────────────────────────────────────────────
 function TableModal({ onSelect, onClose, onScanQR }) {
@@ -1652,11 +1711,69 @@ export default function App() {
     });
   }, []);
 
-  const handleGuest = () => {
-    const a = { role:"guest", name:"Guest", email:null, picture:null };
+// In the App component, replace handleGuest and the related parts:
+
+export default function App() {
+  const [auth,    setAuth]    = useState(() => loadAuth());
+  const [orders,  setOrders]  = useState([]);
+  const [ratings, setRatings] = useState({});
+  const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    return subscribeStore(({ orders, ratings }) => {
+      setOrders(orders);
+      setRatings(ratings);
+    });
+  }, []);
+
+  // REMOVE handleGuest function completely
+
+  const handleGoogle = (user) => {
+    const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
+    const a = { role: isAdmin ? "admin" : "customer", ...user };
     persistAuth(a);
     setAuth(a);
   };
+
+  // Also save user data for future use (coupons, history, etc.)
+  const handleGoogle = (user) => {
+    const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
+    
+    // Save full user profile for rewards/coupons
+    const userProfile = {
+      name: user.name,
+      email: user.email,
+      picture: user.picture,
+      role: isAdmin ? "admin" : "customer",
+      joinedAt: Date.now(),
+      ordersCount: 0,
+      totalSpent: 0,
+      coupons: isAdmin ? [] : ["WELCOME10"], // Give welcome coupon to customers
+      redeemedCoupons: [],
+    };
+    
+    // Load existing user data if any
+    const existingUsers = JSON.parse(localStorage.getItem("bs_users") || "{}");
+    if (!existingUsers[user.email]) {
+      existingUsers[user.email] = userProfile;
+      localStorage.setItem("bs_users", JSON.stringify(existingUsers));
+    } else {
+      // Update existing user but preserve their stats
+      existingUsers[user.email] = {
+        ...existingUsers[user.email],
+        name: user.name,
+        picture: user.picture,
+      };
+      localStorage.setItem("bs_users", JSON.stringify(existingUsers));
+    }
+    
+    persistAuth({ role: isAdmin ? "admin" : "customer", ...user });
+    setAuth({ role: isAdmin ? "admin" : "customer", ...user });
+  };
+
+  // ... rest stays the same
+}
+
 
   const handleGoogle = (user) => {
     const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());

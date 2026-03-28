@@ -130,6 +130,50 @@ function persistOrderHistory(history) {
   try { localStorage.setItem("bs_order_history", JSON.stringify(history)); } catch {}
 }
 
+// ─── USER PROFILES (for history, coupons, rewards) ───────────────────────────
+function loadUsers() {
+  try { return JSON.parse(localStorage.getItem("bs_users") || "{}"); } catch { return {}; }
+}
+function persistUsers(users) {
+  try { localStorage.setItem("bs_users", JSON.stringify(users)); } catch {}
+}
+
+function getUserProfile(email) {
+  const users = loadUsers();
+  return users[email] || null;
+}
+
+function updateUserProfile(email, updates) {
+  const users = loadUsers();
+  users[email] = { ...users[email], ...updates };
+  persistUsers(users);
+}
+
+function createUserProfile(user) {
+  const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
+  if (isAdmin) return null; // Don't create profile for admins
+
+  const profile = {
+    name: user.name,
+    email: user.email,
+    picture: user.picture,
+    joinedAt: Date.now(),
+    ordersCount: 0,
+    totalSpent: 0,
+    coupons: ["WELCOME10"], // Welcome coupon
+    redeemedCoupons: [],
+    rewardPoints: 0,
+  };
+
+  const users = loadUsers();
+  if (!users[user.email]) {
+    users[user.email] = profile;
+    persistUsers(users);
+  }
+
+  return profile;
+}
+
 // ─── SHARED IN-MEMORY STORE ────────────────────────────────────────────────
 let _orders   = loadOrders();
 let _ratings  = loadRatings();
@@ -205,22 +249,18 @@ const css = `
   .auth-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--bg); }
   .auth-card { width:100%; max-width:400px; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:48px 40px 40px; position:relative; }
   .auth-card::before { content:''; position:absolute; top:0; left:40px; right:40px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
-  .auth-brand { text-align:center; margin-bottom:40px; }
+  .auth-brand { text-align:center; margin-bottom:32px; }
   .auth-brand-name { font-family:'DM Serif Display',serif; font-size:36px; color:var(--text); letter-spacing:0.02em; line-height:1; }
   .auth-brand-name em { font-style:italic; color:var(--accent); }
   .auth-tagline { font-size:11px; letter-spacing:0.18em; color:var(--text3); text-transform:uppercase; margin-top:10px; }
-  .auth-cta { width:100%; padding:13px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-size:14px; font-weight:600; letter-spacing:0.04em; transition:background 0.2s,transform 0.1s; margin-bottom:10px; }
-  .auth-cta:hover { background:var(--accent2); }
-  .auth-cta:active { transform:scale(0.99); }
-  .auth-cta-sub { font-size:11px; color:var(--text3); text-align:center; }
-  .auth-divider { display:flex; align-items:center; gap:14px; margin:24px 0; }
-  .auth-divider::before, .auth-divider::after { content:''; flex:1; height:1px; background:var(--line); }
-  .auth-divider span { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text3); white-space:nowrap; }
-  .google-btn { width:100%; padding:12px 18px; border:1px solid var(--line); background:var(--bg3); color:var(--text2); border-radius:var(--r2); font-size:13px; font-weight:400; display:flex; align-items:center; justify-content:center; gap:10px; transition:border-color 0.2s,background 0.2s; }
+  .auth-subtitle { text-align:center; font-size:13px; color:var(--text3); margin-bottom:32px; line-height:1.8; }
+  .google-btn { width:100%; padding:14px 18px; border:1px solid var(--line); background:var(--bg3); color:var(--text2); border-radius:var(--r2); font-size:14px; font-weight:500; display:flex; align-items:center; justify-content:center; gap:12px; transition:border-color 0.2s,background 0.2s; }
   .google-btn:hover:not(:disabled) { border-color:var(--accent); background:var(--bg4); color:var(--text); }
-  .google-btn:disabled { opacity:0.4; cursor:not-allowed; }
-  .auth-note { font-size:11px; color:var(--text3); text-align:center; margin-top:18px; line-height:1.7; }
+  .google-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .auth-note { font-size:11px; color:var(--text3); text-align:center; margin-top:24px; line-height:1.7; }
   .auth-error { margin-top:12px; font-size:12px; color:var(--red); background:rgba(248,113,113,0.07); padding:10px 14px; border-radius:var(--r2); border:1px solid rgba(248,113,113,0.2); text-align:center; }
+  .auth-loader { display:inline-block; width:16px; height:16px; border:2px solid var(--text3); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* Nav */
   .top-nav { background:var(--bg2); border-bottom:1px solid var(--line); height:56px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; gap:12px; }
@@ -229,10 +269,10 @@ const css = `
   .nav-right { display:flex; align-items:center; gap:8px; min-width:0; }
   .nav-role { font-size:10px; letter-spacing:0.16em; text-transform:uppercase; padding:4px 10px; border-radius:20px; border:1px solid; white-space:nowrap; flex-shrink:0; }
   .nav-role.admin { border-color:rgba(200,169,126,0.35); color:var(--accent); background:rgba(200,169,126,0.08); }
-  .nav-role.customer, .nav-role.guest { border-color:var(--line); color:var(--text3); }
-  .nav-user { display:flex; align-items:center; gap:7px; min-width:0; max-width:140px; }
-  .nav-avatar { width:26px; height:26px; border-radius:50%; flex-shrink:0; object-fit:cover; border:1px solid var(--line); }
-  .nav-avatar-init { width:26px; height:26px; border-radius:50%; flex-shrink:0; background:var(--bg4); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:var(--text2); }
+  .nav-role.customer { border-color:var(--line); color:var(--text3); }
+  .nav-user { display:flex; align-items:center; gap:7px; min-width:0; max-width:160px; }
+  .nav-avatar { width:28px; height:28px; border-radius:50%; flex-shrink:0; object-fit:cover; border:1px solid var(--line); }
+  .nav-avatar-init { width:28px; height:28px; border-radius:50%; flex-shrink:0; background:var(--bg4); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; color:var(--text2); }
   .nav-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--text2); }
   .nav-signout { padding:5px 12px; border:1px solid var(--line); background:transparent; color:var(--text3); border-radius:var(--r2); font-size:11px; letter-spacing:0.06em; transition:all 0.18s; white-space:nowrap; flex-shrink:0; }
   .nav-signout:hover { border-color:var(--red); color:var(--red); }
@@ -277,9 +317,11 @@ const css = `
   .cart-bar-count { font-size:12px; color:var(--text3); }
   .cart-bar-count strong { color:var(--text); font-weight:600; }
   .cart-total { font-family:'DM Serif Display',serif; font-size:20px; color:var(--text); }
+  .cart-discount { font-size:11px; color:var(--green); margin-left:6px; }
   .cart-place { width:100%; padding:13px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-size:14px; font-weight:600; letter-spacing:0.04em; transition:background 0.2s,transform 0.1s; }
   .cart-place:hover { background:var(--accent2); color:#fff; }
   .cart-place:active { transform:scale(0.99); }
+  .cart-place:disabled { opacity:0.6; cursor:not-allowed; }
   .live-insights { margin:18px 14px 0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
   .insight-card { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; min-width:0; }
   .insight-label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
@@ -335,6 +377,27 @@ const css = `
   .history-reorder-btn { padding:6px 14px; border:1px solid var(--line); background:transparent; color:var(--text2); border-radius:var(--r2); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; transition:all 0.18s; }
   .history-reorder-btn:hover { border-color:var(--accent); color:var(--accent); }
 
+  /* Coupons */
+  .coupon-banner { margin:18px 14px 0; background:linear-gradient(135deg,rgba(200,169,126,0.15),rgba(200,169,126,0.05)); border:1px solid rgba(200,169,126,0.3); border-radius:var(--r); padding:16px 18px; }
+  .coupon-banner-title { font-size:12px; font-weight:600; color:var(--accent); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .coupon-list { display:flex; flex-direction:column; gap:8px; }
+  .coupon-chip { background:var(--bg3); border:1px dashed rgba(200,169,126,0.4); border-radius:var(--r2); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .coupon-chip.used { opacity:0.5; border-style:dashed; border-color:var(--line); }
+  .coupon-info { flex:1; min-width:0; }
+  .coupon-code { font-family:'DM Serif Display',serif; font-size:16px; color:var(--accent); }
+  .coupon-desc { font-size:11px; color:var(--text3); margin-top:2px; }
+  .coupon-badge { font-size:9px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 8px; border-radius:10px; background:rgba(52,211,153,0.1); color:var(--green); border:1px solid rgba(52,211,153,0.3); white-space:nowrap; }
+  .coupon-badge.used { background:rgba(92,90,87,0.1); color:var(--text3); border-color:var(--line); }
+  .coupon-input-wrap { display:flex; gap:8px; margin-top:12px; }
+  .coupon-input { flex:1; padding:10px 14px; background:var(--bg3); border:1px solid var(--line); border-radius:var(--r2); color:var(--text); font-size:13px; font-family:inherit; }
+  .coupon-input::placeholder { color:var(--text3); }
+  .coupon-input:focus { border-color:var(--accent); outline:none; }
+  .coupon-apply-btn { padding:10px 16px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-size:12px; font-weight:600; font-family:inherit; transition:background 0.2s; white-space:nowrap; }
+  .coupon-apply-btn:hover { background:var(--accent2); }
+  .coupon-apply-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .coupon-success { font-size:11px; color:var(--green); margin-top:6px; display:flex; align-items:center; gap:4px; }
+  .coupon-error { font-size:11px; color:var(--red); margin-top:6px; }
+
   /* Confirm Page */
   .confirm-page { max-width:500px; margin:0 auto; padding:48px 20px 40px; display:flex; flex-direction:column; align-items:center; text-align:center; }
   .confirm-seal { font-size:56px; margin-bottom:20px; animation:sealIn 0.5s cubic-bezier(0.34,1.56,0.64,1); }
@@ -350,6 +413,7 @@ const css = `
   .receipt-row { display:flex; justify-content:space-between; font-size:13px; }
   .receipt-row .lbl { color:var(--text2); }
   .receipt-row .val { font-weight:500; color:var(--text); }
+  .receipt-discount { display:flex; justify-content:space-between; font-size:13px; color:var(--green); }
   .receipt-total { display:flex; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
   .receipt-total .lbl { color:var(--text3); font-size:11px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; align-self:center; }
   .receipt-total .val { font-family:'DM Serif Display',serif; font-size:22px; color:var(--accent); }
@@ -381,6 +445,7 @@ const css = `
   .modal-title { font-family:'DM Serif Display',serif; font-size:26px; color:var(--text); margin-bottom:8px; }
   .modal-sub { font-size:12px; color:var(--text3); margin-bottom:22px; line-height:1.6; }
   .modal-amount { font-family:'DM Serif Display',serif; font-size:42px; color:var(--accent); margin-bottom:20px; }
+  .modal-discount { font-size:14px; color:var(--green); margin-bottom:10px; }
   .upi-apps { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:16px; }
   .upi-app { padding:14px 10px; border:1px solid var(--line); background:var(--bg3); border-radius:var(--r2); cursor:pointer; transition:all 0.18s; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .upi-app:hover { border-color:var(--accent); background:var(--bg4); }
@@ -389,6 +454,7 @@ const css = `
   .upi-app-name { font-size:11px; color:var(--text2); font-weight:500; }
   .cash-btn { width:100%; padding:14px; background:var(--green); color:#000; border:none; border-radius:var(--r2); font-size:13px; font-weight:600; transition:all 0.2s; margin-top:8px; }
   .cash-btn:hover { opacity:0.9; }
+  .cash-btn:disabled { opacity:0.5; cursor:not-allowed; }
   .pay-btn { width:100%; padding:14px; background:var(--accent); color:var(--bg); border:none; border-radius:var(--r2); font-size:14px; font-weight:600; transition:all 0.2s; margin-top:12px; }
   .pay-btn:hover { background:var(--accent2); }
   .pay-btn:disabled { opacity:0.5; cursor:not-allowed; }
@@ -396,6 +462,7 @@ const css = `
   .qr-code { background:#fff; padding:16px; border-radius:var(--r); display:inline-block; }
   .qr-placeholder { width:150px; height:150px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; color:#999; gap:4px; }
   .qr-amount { font-size:18px; color:var(--text); margin-top:12px; }
+  .qr-amount .original { text-decoration:line-through; color:var(--text3); font-size:14px; margin-right:8px; }
   .qr-note { font-size:11px; color:var(--text3); margin-top:8px; line-height:1.6; }
   .payment-success { padding:20px 0; }
   .payment-success-icon { font-size:64px; margin-bottom:16px; }
@@ -459,7 +526,6 @@ const css = `
   .admin-date { font-size:11px; color:var(--text3); margin-top:5px; letter-spacing:0.06em; }
   .live-pill { display:flex; align-items:center; gap:6px; font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--green); font-weight:600; padding:5px 12px; border-radius:20px; border:1px solid rgba(52,211,153,0.25); background:rgba(52,211,153,0.06); }
   .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:.3;} }
   .kpi-strip { display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
   .kpi-card { flex:1; min-width:80px; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:16px 18px; }
   .kpi-val { font-family:'DM Serif Display',serif; font-size:30px; font-weight:300; line-height:1; margin-bottom:5px; }
@@ -478,6 +544,8 @@ const css = `
   .tile-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
   .tile-id { font-family:'DM Serif Display',serif; font-size:18px; color:var(--accent); }
   .tile-meta { font-size:11px; color:var(--text3); margin-top:2px; }
+  .tile-user { font-size:11px; color:var(--text3); margin-top:4px; display:flex; align-items:center; gap:6px; }
+  .tile-user img { width:20px; height:20px; border-radius:50%; border:1px solid var(--line); }
   .tile-table-badge { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; background:var(--bg3); border:1px solid var(--line); border-radius:var(--r2); padding:3px 9px; color:var(--text2); font-weight:500; white-space:nowrap; }
   .tile-items { margin-bottom:12px; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); padding:9px 0; display:flex; flex-direction:column; gap:5px; }
   .tile-item { display:flex; justify-content:space-between; font-size:12px; }
@@ -486,6 +554,7 @@ const css = `
   .tile-footer { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
   .tile-total { font-size:12px; color:var(--text3); }
   .tile-total strong { font-family:'DM Serif Display',serif; font-size:16px; color:var(--accent); font-weight:400; }
+  .tile-discount { font-size:11px; color:var(--green); margin-left:6px; }
   .status-btns { display:flex; gap:4px; }
   .status-btn { flex:1; padding:7px 4px; text-align:center; font-size:10px; letter-spacing:0.06em; text-transform:uppercase; font-weight:500; border:1px solid var(--line); border-radius:var(--r2); background:transparent; color:var(--text3); transition:all 0.15s; }
   .status-btn:hover:not(.sb-active) { border-color:var(--text3); color:var(--text2); }
@@ -568,6 +637,20 @@ const css = `
   .analytics-stars { font-size:11px; color:#f59e0b; }
   .analytics-rating-val { font-size:10px; color:var(--text3); }
 
+  /* Users Admin Tab */
+  .users-list { display:flex; flex-direction:column; gap:8px; }
+  .user-card { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:14px 18px; display:flex; align-items:center; gap:12px; }
+  .user-card-avatar { width:40px; height:40px; border-radius:50%; object-fit:cover; border:1px solid var(--line); flex-shrink:0; }
+  .user-card-avatar-init { width:40px; height:40px; border-radius:50%; background:var(--bg4); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; color:var(--text2); flex-shrink:0; }
+  .user-card-info { flex:1; min-width:0; }
+  .user-card-name { font-size:14px; font-weight:500; color:var(--text); }
+  .user-card-email { font-size:11px; color:var(--text3); margin-top:2px; }
+  .user-card-stats { display:flex; gap:16px; margin-top:6px; }
+  .user-card-stat { font-size:10px; color:var(--text3); }
+  .user-card-stat strong { color:var(--text); }
+  .user-card-role { font-size:10px; letter-spacing:0.08em; text-transform:uppercase; padding:3px 10px; border-radius:10px; border:1px solid var(--line); color:var(--text3); }
+  .user-card-role.admin { border-color:rgba(200,169,126,0.35); color:var(--accent); background:rgba(200,169,126,0.08); }
+
   /* Print Styles */
   @media print {
     body * { visibility:hidden; }
@@ -578,6 +661,7 @@ const css = `
     .print-meta { font-size:11px; color:#666; margin:4px 0; }
     .print-items { border-top:1px dashed #000; border-bottom:1px dashed #000; padding:8px 0; margin:10px 0; }
     .print-item { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+    .print-discount { color:#008000; font-size:12px; }
     .print-total { font-size:16px; font-weight:bold; display:flex; justify-content:space-between; margin-top:10px; }
     .print-footer { margin-top:20px; text-align:center; font-size:10px; color:#666; }
     .no-print { display:none !important; }
@@ -725,6 +809,7 @@ function PrintReceipt({ order }) {
       <div className="print-brand">🍽️ BistroSpice</div>
       <div className="print-id">{order.id}</div>
       <div className="print-meta">Table {order.table} · {fmtDateTime(order.timestamp)}</div>
+      <div className="print-meta">Customer: {order.userName} · {order.userEmail}</div>
       <div className="print-items">
         {order.items.map((i, idx) => (
           <div key={idx} className="print-item">
@@ -733,6 +818,9 @@ function PrintReceipt({ order }) {
           </div>
         ))}
       </div>
+      {order.discount > 0 && (
+        <div className="print-discount">Discount: -₹{order.discount}</div>
+      )}
       <div className="print-total">
         <span>TOTAL</span><span>₹{order.total}</span>
       </div>
@@ -747,10 +835,11 @@ function PrintReceipt({ order }) {
 }
 
 // ─── PAYMENT MODAL ──────────────────────────────────────────────────────────
-function PaymentModal({ total, onPaymentComplete, onClose }) {
+function PaymentModal({ total, discount, appliedCoupon, onPaymentComplete, onClose }) {
   const [selectedApp, setSelectedApp] = useState(null);
   const [step, setStep] = useState("select");
   const [loading, setLoading] = useState(false);
+  const finalAmount = total - discount;
   const upiId = "bistrospice@upi";
 
   const handleCash = () => {
@@ -812,7 +901,13 @@ function PaymentModal({ total, onPaymentComplete, onClose }) {
           <>
             <div className="modal-title" id="payment-title">Choose Payment Method</div>
             <p className="modal-sub">Select how you'd like to pay</p>
-            <div className="modal-amount">₹{total}</div>
+            {discount > 0 && (
+              <div className="modal-discount">🎉 ₹{discount} off with {appliedCoupon}</div>
+            )}
+            <div className="modal-amount">
+              {discount > 0 && <span style={{fontSize:24,textDecoration:"line-through",color:"var(--text3)",marginRight:12}}>₹{total}</span>}
+              ₹{finalAmount}
+            </div>
             <div className="upi-apps" role="radiogroup" aria-label="UPI payment apps">
               {UPI_APPS.map(app => (
                 <button key={app.id} className={`upi-app ${selectedApp === app.id ? "selected" : ""}`}
@@ -841,10 +936,13 @@ function PaymentModal({ total, onPaymentComplete, onClose }) {
                 <div className="qr-placeholder">
                   📱
                   <span>QR Code</span>
-                  <span>₹{total}</span>
+                  <span>₹{finalAmount}</span>
                 </div>
               </div>
-              <div className="qr-amount">Amount: ₹{total}</div>
+              <div className="qr-amount">
+                {discount > 0 && <span className="original">₹{total}</span>}
+                ₹{finalAmount}
+              </div>
               <div className="qr-note">UPI ID: {upiId}<br/>Or pay to: BistroSpice</div>
             </div>
             <button className="pay-btn" onClick={handleQRPaid} disabled={loading}>
@@ -858,26 +956,18 @@ function PaymentModal({ total, onPaymentComplete, onClose }) {
   );
 }
 
-// ─── AUTH SCREEN ─────────────────────────────────────────────────────────────
-// Replace the AuthScreen component with this:
-
+// ─── AUTH SCREEN (SIGN IN REQUIRED) ──────────────────────────────────────────
 function AuthScreen({ onGoogle }) {
   const { ready, signIn } = useGIS();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleGoogleSignIn = () => {
+  const handleSignIn = () => {
     setError("");
     setLoading(true);
     signIn(
-      (user) => {
-        setLoading(false);
-        onGoogle(user);
-      },
-      (err) => {
-        setLoading(false);
-        setError(err || "Sign-in failed. Please try again.");
-      }
+      (user) => { setLoading(false); onGoogle(user); },
+      (err) => { setLoading(false); setError(err || "Sign-in failed. Please try again."); }
     );
   };
 
@@ -889,66 +979,46 @@ function AuthScreen({ onGoogle }) {
           <div className="auth-tagline">Table Ordering System</div>
         </div>
 
-        <p className="auth-note" style={{ marginBottom: "24px", lineHeight: 1.8 }}>
+        <p className="auth-subtitle">
           Sign in to order food at your table.<br/>
           Your order history and rewards will be saved.
         </p>
 
-        <div id="g-btn-slot" style={{ display: "flex", justifyContent: "center", minHeight: 44, marginBottom: 12 }} />
+        <div id="g-btn-slot" style={{ display: "flex", justifyContent: "center", minHeight: 48, marginBottom: 8 }} />
 
         <button
           className="google-btn"
-          onClick={handleGoogleSignIn}
+          onClick={handleSignIn}
           disabled={!ready || loading}
-          aria-label="Sign in with Google"
         >
           {loading ? (
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{
-                width: 16,
-                height: 16,
-                border: "2px solid var(--text3)",
-                borderTopColor: "var(--accent)",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite"
-              }} />
+            <>
+              <span className="auth-loader" />
               Signing in...
-            </span>
+            </>
           ) : (
             <>
-              <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                 <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
                 <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
                 <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
                 <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
               </svg>
-              {ready ? "Continue with Google" : "Loading…"}
+              {ready ? "Sign in with Google" : "Loading..."}
             </>
           )}
         </button>
 
-        {error && (
-          <div className="auth-error" role="alert">
-            {error}
-          </div>
-        )}
+        {error && <div className="auth-error" role="alert">{error}</div>}
 
-        <p className="auth-note" style={{ marginTop: "18px" }}>
-          Admin accounts are automatically recognized.<br/>
-          Contact the manager if you need access.
+        <p className="auth-note">
+          Your account will be recognized on return visits.<br/>
+          Contact the manager if you need admin access.
         </p>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
-
 
 // ─── TABLE MODAL ─────────────────────────────────────────────────────────────
 function TableModal({ onSelect, onClose, onScanQR }) {
@@ -1038,6 +1108,75 @@ function RatingPopup({ order, onSubmit, onSkip }) {
   );
 }
 
+// ─── COUPON BANNER ───────────────────────────────────────────────────────────
+function CouponBanner({ userProfile, onApplyCoupon, appliedCoupon, couponError, couponSuccess }) {
+  const [input, setInput] = useState("");
+
+  const handleApply = () => {
+    if (input.trim()) {
+      onApplyCoupon(input.trim().toUpperCase());
+    }
+  };
+
+  if (!userProfile) return null;
+
+  const availableCoupons = userProfile.coupons || [];
+  const redeemedCoupons = userProfile.redeemedCoupons || [];
+
+  return (
+    <div className="coupon-banner fade-up">
+      <div className="coupon-banner-title">🎫 Your Coupons</div>
+      
+      {availableCoupons.length > 0 ? (
+        <div className="coupon-list">
+          {availableCoupons.map(code => (
+            <div key={code} className="coupon-chip">
+              <div className="coupon-info">
+                <div className="coupon-code">{code}</div>
+                <div className="coupon-desc">
+                  {code === "WELCOME10" ? "10% off on your first order" : "Discount coupon"}
+                </div>
+              </div>
+              {appliedCoupon === code && (
+                <span className="coupon-badge">Applied</span>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p style={{fontSize:"12px",color:"var(--text3)",marginBottom:"12px"}}>
+          No coupons available yet. Keep ordering to earn more!
+        </p>
+      )}
+
+      <div className="coupon-input-wrap">
+        <input
+          type="text"
+          className="coupon-input"
+          placeholder="Enter coupon code"
+          value={input}
+          onChange={e => setInput(e.target.value.toUpperCase())}
+          onKeyDown={e => e.key === "Enter" && handleApply()}
+        />
+        <button 
+          className="coupon-apply-btn" 
+          onClick={handleApply}
+          disabled={!input.trim() || appliedCoupon}
+        >
+          Apply
+        </button>
+      </div>
+
+      {couponSuccess && (
+        <div className="coupon-success">✓ {couponSuccess}</div>
+      )}
+      {couponError && (
+        <div className="coupon-error">{couponError}</div>
+      )}
+    </div>
+  );
+}
+
 // ─── ORDER HISTORY VIEW ───────────────────────────────────────────────────────
 function OrderHistoryView({ onReorder, onBack }) {
   const history = loadOrderHistory();
@@ -1084,6 +1223,7 @@ function OrderHistoryView({ onReorder, onBack }) {
               <div className="history-card-footer">
                 <div style={{fontSize:12,color:"var(--text3)"}}>
                   Total: <strong style={{fontFamily:"'DM Serif Display',serif",fontSize:16,color:"var(--accent)",fontWeight:400}}>₹{order.total}</strong>
+                  {order.discount > 0 && <span style={{color:"var(--green)",marginLeft:6}}>(-₹{order.discount})</span>}
                 </div>
                 <button className="history-reorder-btn" onClick={() => onReorder(order)} aria-label={`Reorder from ${order.id}`}>
                   ↻ Reorder
@@ -1098,7 +1238,7 @@ function OrderHistoryView({ onReorder, onBack }) {
 }
 
 // ─── CUSTOMER VIEW ────────────────────────────────────────────────────────────
-function CustomerView({ orders, ratings, onPlaceOrder }) {
+function CustomerView({ orders, ratings, onPlaceOrder, user }) {
   const [table, setTable]           = useState(null);
   const [showModal, setShowModal]   = useState(false);
   const [showQR, setShowQR]         = useState(false);
@@ -1111,12 +1251,26 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
   const [showPayment, setShowPayment] = useState(false);
   const [notification, setNotification] = useState(null);
   const [view, setView]             = useState("menu");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponError, setCouponError] = useState("");
+  const [couponSuccess, setCouponSuccess] = useState("");
+  const [userProfile, setUserProfile] = useState(null);
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(""), 2000); };
 
+  // Load user profile on mount
+  useEffect(() => {
+    if (user?.email) {
+      const profile = getUserProfile(user.email);
+      setUserProfile(profile);
+    }
+  }, [user?.email]);
+
   const cartItems = Object.entries(cart).map(([id, qty]) => ({...MENU.find(m => m.id === +id), qty})).filter(Boolean);
-  const total     = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const totalQty  = cartItems.reduce((s, i) => s + i.qty, 0);
+  const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const total = subtotal - couponDiscount;
+  const totalQty = cartItems.reduce((s, i) => s + i.qty, 0);
 
   const updateCart = (id, delta) =>
     setCart(prev => {
@@ -1126,7 +1280,7 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
     });
 
   const filtered = MENU.filter(i => cat === "All" || i.category === cat);
-  const grouped  = CATEGORIES.slice(1).map(c => ({c, items: filtered.filter(i => i.category === c)})).filter(g => g.items.length);
+  const grouped = CATEGORIES.slice(1).map(c => ({c, items: filtered.filter(i => i.category === c)})).filter(g => g.items.length);
   const activeOrders = orders.filter(o => o.status !== "Ready");
   const popularItem = [...MENU].map(item => ({
     ...item, count: orders.reduce((sum, o) => {
@@ -1143,6 +1297,65 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
     {key:"preparing", label:"Kitchen updates in real time", meta:"Staff can switch an order from received to preparing to ready."},
     {key:"ready", label:"Pickup notification state", meta:"Your receipt automatically turns green when the order is marked ready."},
   ];
+
+  // Coupons
+  const COUPON_CODES = {
+    "WELCOME10": { discount: 0.10, type: "percent", desc: "10% off" },
+    "SAVE50": { discount: 50, type: "fixed", desc: "₹50 off" },
+    "BISTRO20": { discount: 0.20, type: "percent", desc: "20% off" },
+    "FLAT100": { discount: 100, type: "fixed", desc: "₹100 off" },
+  };
+
+  const handleApplyCoupon = (code) => {
+    setCouponError("");
+    setCouponSuccess("");
+
+    // Check if it's in user's available coupons
+    const availableCoupons = userProfile?.coupons || [];
+    const redeemedCoupons = userProfile?.redeemedCoupons || [];
+
+    if (redeemedCoupons.includes(code)) {
+      setCouponError("This coupon has already been used.");
+      return;
+    }
+
+    const coupon = COUPON_CODES[code];
+    if (!coupon) {
+      setCouponError("Invalid coupon code.");
+      return;
+    }
+
+    // Calculate discount
+    let discount = 0;
+    if (coupon.type === "percent") {
+      discount = Math.round(subtotal * coupon.discount);
+    } else {
+      discount = coupon.discount;
+    }
+
+    // Cap discount at subtotal
+    discount = Math.min(discount, subtotal);
+
+    setAppliedCoupon(code);
+    setCouponDiscount(discount);
+    setCouponSuccess(`🎉 ${coupon.desc} applied!`);
+
+    // Remove from available coupons
+    if (availableCoupons.includes(code)) {
+      const updatedProfile = { ...userProfile };
+      updatedProfile.coupons = updatedProfile.coupons.filter(c => c !== code);
+      updatedProfile.redeemedCoupons = [...(updatedProfile.redeemedCoupons || []), code];
+      updateUserProfile(user.email, updatedProfile);
+      setUserProfile(updatedProfile);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setCouponError("");
+    setCouponSuccess("");
+  };
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
@@ -1167,16 +1380,52 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
   const handlePaymentComplete = (method, details) => {
     setShowPayment(false);
     const order = {
-      id: genId(), table, status: "Received",
-      timestamp: Date.now(), total,
+      id: genId(),
+      table,
+      status: "Received",
+      timestamp: Date.now(),
+      subtotal,
+      discount: couponDiscount,
+      total,
       items: cartItems.map(i => ({id: i.id, name: i.name, qty: i.qty, price: i.price})),
       payment: { method, details, amount: total },
+      userName: user.name,
+      userEmail: user.email,
+      userPicture: user.picture,
     };
+
     onPlaceOrder(order);
+
+    // Update user stats
+    if (userProfile) {
+      const updatedProfile = {
+        ...userProfile,
+        ordersCount: (userProfile.ordersCount || 0) + 1,
+        totalSpent: (userProfile.totalSpent || 0) + total,
+        rewardPoints: (userProfile.rewardPoints || 0) + Math.floor(total / 10),
+      };
+      updateUserProfile(user.email, updatedProfile);
+      setUserProfile(updatedProfile);
+
+      // Give reward coupon every 5 orders
+      if (updatedProfile.ordersCount % 5 === 0) {
+        const rewardCoupon = "BISTRO20";
+        if (!updatedProfile.coupons?.includes(rewardCoupon)) {
+          updatedProfile.coupons = [...(updatedProfile.coupons || []), rewardCoupon];
+          updateUserProfile(user.email, updatedProfile);
+          setUserProfile(updatedProfile);
+          showToast("🎁 You earned a 20% off coupon!");
+        }
+      }
+    }
+
     setConfirmed(order);
     setCart({});
     setRatingDone(false);
     setShowRating(false);
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+
     const history = loadOrderHistory();
     persistOrderHistory([order, ...history]);
     showToast("Order placed successfully!");
@@ -1191,10 +1440,10 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
     showToast("Items added to cart");
   };
 
-  const liveOrder  = confirmed ? (orders.find(o => o.id === confirmed.id) || confirmed) : null;
+  const liveOrder = confirmed ? (orders.find(o => o.id === confirmed.id) || confirmed) : null;
   const liveStatus = liveOrder?.status || "Received";
-  const statusIdx  = STATUS_FLOW.indexOf(liveStatus);
-  const isReady    = liveStatus === "Ready";
+  const statusIdx = STATUS_FLOW.indexOf(liveStatus);
+  const isReady = liveStatus === "Ready";
 
   useEffect(() => {
     if (isReady && confirmed && !ratingDone) {
@@ -1232,6 +1481,12 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
                 </div>
               ))}
             </div>
+            {confirmed.discount > 0 && (
+              <div className="receipt-discount">
+                <span>Coupon ({appliedCoupon})</span>
+                <span>-₹{confirmed.discount}</span>
+              </div>
+            )}
             <div className="receipt-total">
               <span className="lbl">Total</span>
               <span className="val">₹{confirmed.total}</span>
@@ -1244,8 +1499,7 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
             <div className="status-track-label">Live Status</div>
             <div className="status-track" role="progressbar" aria-label="Order status">
               {STATUS_FLOW.map((s, i) => (
-                <div key={s} className={`status-step ${i < statusIdx ? "done" : i === statusIdx ? "current" : "pending"}`}
-                  aria-label={`${s}: ${i < statusIdx ? "completed" : i === statusIdx ? "current" : "pending"}`}>
+                <div key={s} className={`status-step ${i < statusIdx ? "done" : i === statusIdx ? "current" : "pending"}`}>
                   {s}
                 </div>
               ))}
@@ -1303,6 +1557,14 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
             <span className="table-prompt-cta">Select →</span>
           </div>
         )}
+
+        <CouponBanner
+          userProfile={userProfile}
+          onApplyCoupon={handleApplyCoupon}
+          appliedCoupon={appliedCoupon}
+          couponError={couponError}
+          couponSuccess={couponSuccess}
+        />
 
         <div className="live-insights">
           <div className="insight-card">
@@ -1413,7 +1675,10 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
         <div className="cart-bar">
           <div className="cart-bar-row">
             <span className="cart-bar-count"><strong>{totalQty}</strong> item{totalQty !== 1 ? "s" : ""} selected</span>
-            <span className="cart-total">₹{total}</span>
+            <span className="cart-total">
+              ₹{total}
+              {couponDiscount > 0 && <span className="cart-discount">(-₹{couponDiscount})</span>}
+            </span>
           </div>
           <button className="cart-place" onClick={handlePlace} aria-label={`Place order for ₹${total}`}>
             Place Order{table ? ` · Table ${table}` : ""}
@@ -1423,7 +1688,7 @@ function CustomerView({ orders, ratings, onPlaceOrder }) {
 
       {showModal && <TableModal onSelect={t => {setTable(t); setShowModal(false);}} onClose={() => setShowModal(false)} onScanQR={() => {setShowModal(false); setShowQR(true);}}/>}
       {showQR && <QRScanner onScan={t => {setTable(t); setShowQR(false); showToast(`Table ${t} selected`);}} onClose={() => setShowQR(false)}/>}
-      {showPayment && <PaymentModal total={total} onPaymentComplete={handlePaymentComplete} onClose={() => setShowPayment(false)}/>}
+      {showPayment && <PaymentModal total={subtotal} discount={couponDiscount} appliedCoupon={appliedCoupon} onPaymentComplete={handlePaymentComplete} onClose={() => setShowPayment(false)}/>}
       <Toast msg={toast}/>
     </>
   );
@@ -1467,6 +1732,46 @@ function AnalyticsView({ orders, ratings }) {
                 </div>
               )}
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── USERS VIEW (Admin) ────────────────────────────────────────────────────────
+function UsersView() {
+  const users = Object.values(loadUsers());
+
+  if (!users.length) {
+    return (
+      <div className="analytics-empty">
+        No users have signed up yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-up">
+      <div className="analytics-section-title">Registered Users ({users.length})</div>
+      <div className="users-list">
+        {users.sort((a, b) => (b.ordersCount || 0) - (a.ordersCount || 0)).map(user => (
+          <div key={user.email} className="user-card">
+            {user.picture ? (
+              <img src={user.picture} alt={user.name} className="user-card-avatar" referrerPolicy="no-referrer"/>
+            ) : (
+              <div className="user-card-avatar-init">{user.name?.[0] || "?"}</div>
+            )}
+            <div className="user-card-info">
+              <div className="user-card-name">{user.name}</div>
+              <div className="user-card-email">{user.email}</div>
+              <div className="user-card-stats">
+                <span className="user-card-stat"><strong>{user.ordersCount || 0}</strong> orders</span>
+                <span className="user-card-stat"><strong>₹{user.totalSpent || 0}</strong> spent</span>
+                <span className="user-card-stat"><strong>{user.rewardPoints || 0}</strong> points</span>
+              </div>
+            </div>
+            <span className="user-card-role">Customer</span>
           </div>
         ))}
       </div>
@@ -1540,7 +1845,10 @@ function KitchenDisplayMode({ orders, onUpdateStatus, onClose }) {
                     </div>
                   ))}
                 </div>
-                <div className="kitchen-card-total">Total: <strong>₹{order.total}</strong></div>
+                <div className="kitchen-card-total">
+                  Total: <strong>₹{order.total}</strong>
+                  {order.discount > 0 && <span style={{color:"var(--green)",marginLeft:6}}>(-₹{order.discount})</span>}
+                </div>
               </div>
               <div className="kitchen-card-actions">
                 {order.status === "Received" && (
@@ -1564,18 +1872,18 @@ function KitchenDisplayMode({ orders, onUpdateStatus, onClose }) {
 
 // ─── ADMIN VIEW ───────────────────────────────────────────────────────────────
 function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
-  const [tab, setTab]           = useState("orders");
-  const [filter, setFilter]     = useState("All");
+  const [tab, setTab] = useState("orders");
+  const [filter, setFilter] = useState("All");
   const [showKitchen, setShowKitchen] = useState(false);
 
   const filtered = filter === "All" ? orders : orders.filter(o => o.status === filter);
   const counts = {
-    All:      orders.length,
-    Received: orders.filter(o => o.status === "Received").length,
-    Preparing: orders.filter(o => o.status === "Preparing").length,
-    Ready:    orders.filter(o => o.status === "Ready").length,
+    All: orders.filter(o => o.userEmail).length,
+    Received: orders.filter(o => o.status === "Received" && o.userEmail).length,
+    Preparing: orders.filter(o => o.status === "Preparing" && o.userEmail).length,
+    Ready: orders.filter(o => o.status === "Ready" && o.userEmail).length,
   };
-  const revenue = orders.reduce((s, o) => s + o.total, 0);
+  const revenue = orders.filter(o => o.userEmail).reduce((s, o) => s + o.total, 0);
 
   if (showKitchen) {
     return <KitchenDisplayMode orders={orders} onUpdateStatus={onUpdateStatus} onClose={() => setShowKitchen(false)}/>;
@@ -1596,11 +1904,11 @@ function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
 
       <div className="kpi-strip">
         {[
-          {label:"Total",     val:counts.All,        color:"var(--accent)"},
-          {label:"Received",  val:counts.Received,    color:"var(--blue)"},
-          {label:"Preparing", val:counts.Preparing,   color:"var(--amber)"},
-          {label:"Ready",     val:counts.Ready,      color:"var(--green)"},
-          {label:"Revenue",   val:`₹${revenue}`,     color:"var(--text)"},
+          {label:"Total Orders", val:counts.All, color:"var(--accent)"},
+          {label:"Received", val:counts.Received, color:"var(--blue)"},
+          {label:"Preparing", val:counts.Preparing, color:"var(--amber)"},
+          {label:"Ready", val:counts.Ready, color:"var(--green)"},
+          {label:"Revenue", val:`₹${revenue}`, color:"var(--text)"},
         ].map(({label,val,color}) => (
           <div key={label} className="kpi-card">
             <div className="kpi-val" style={{color}}>{val}</div>
@@ -1612,10 +1920,13 @@ function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
       <div style={{display:"flex",gap:8,marginBottom:24,flexWrap:"wrap",alignItems:"center"}}>
         <div className="admin-tabs" style={{marginBottom:0}}>
           <button className={`admin-tab ${tab === "orders" ? "on" : ""}`} onClick={() => setTab("orders")}>
-            Live Orders{counts.All > 0 ? ` · ${counts.All}` : ""}
+            Orders{counts.All > 0 ? ` · ${counts.All}` : ""}
           </button>
           <button className={`admin-tab ${tab === "analytics" ? "on" : ""}`} onClick={() => setTab("analytics")}>
             Analytics
+          </button>
+          <button className={`admin-tab ${tab === "users" ? "on" : ""}`} onClick={() => setTab("users")}>
+            Users
           </button>
         </div>
         <button className="kitchen-mode-btn" onClick={() => setShowKitchen(true)} aria-label="Open kitchen display mode">
@@ -1648,6 +1959,12 @@ function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
                       <div>
                         <div className="tile-id">{order.id}</div>
                         <div className="tile-meta">{fmtDateTime(order.timestamp)}</div>
+                        {order.userName && (
+                          <div className="tile-user">
+                            {order.userPicture && <img src={order.userPicture} alt="" referrerPolicy="no-referrer"/>}
+                            {order.userName}
+                          </div>
+                        )}
                       </div>
                       <div className="tile-table-badge">Table {order.table}</div>
                     </div>
@@ -1660,7 +1977,10 @@ function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
                       ))}
                     </div>
                     <div className="tile-footer">
-                      <div className="tile-total">Total: <strong>₹{order.total}</strong></div>
+                      <div className="tile-total">
+                        Total: <strong>₹{order.total}</strong>
+                        {order.discount > 0 && <span className="tile-discount">(-₹{order.discount})</span>}
+                      </div>
                       <div style={{fontSize:10,letterSpacing:"0.08em",textTransform:"uppercase",color:STATUS_COLOR[order.status],fontWeight:600,border:`1px solid ${STATUS_COLOR[order.status]}44`,padding:"2px 8px",borderRadius:20}}>
                         {order.status}
                       </div>
@@ -1692,7 +2012,8 @@ function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
         </>
       )}
 
-      {tab === "analytics" && <AnalyticsView orders={orders} ratings={ratings}/>}
+      {tab === "analytics" && <AnalyticsView orders={orders.filter(o => o.userEmail)} ratings={ratings}/>}
+      {tab === "users" && <UsersView/>}
     </div>
   );
 }
@@ -1711,72 +2032,12 @@ export default function App() {
     });
   }, []);
 
-// In the App component, replace handleGuest and the related parts:
-
-export default function App() {
-  const [auth,    setAuth]    = useState(() => loadAuth());
-  const [orders,  setOrders]  = useState([]);
-  const [ratings, setRatings] = useState({});
-  const { theme, toggleTheme } = useTheme();
-
-  useEffect(() => {
-    return subscribeStore(({ orders, ratings }) => {
-      setOrders(orders);
-      setRatings(ratings);
-    });
-  }, []);
-
-  // REMOVE handleGuest function completely
-
-  const handleGoogle = (user) => {
-    const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
-    const a = { role: isAdmin ? "admin" : "customer", ...user };
-    persistAuth(a);
-    setAuth(a);
-  };
-
-  // Also save user data for future use (coupons, history, etc.)
   const handleGoogle = (user) => {
     const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
     
-    // Save full user profile for rewards/coupons
-    const userProfile = {
-      name: user.name,
-      email: user.email,
-      picture: user.picture,
-      role: isAdmin ? "admin" : "customer",
-      joinedAt: Date.now(),
-      ordersCount: 0,
-      totalSpent: 0,
-      coupons: isAdmin ? [] : ["WELCOME10"], // Give welcome coupon to customers
-      redeemedCoupons: [],
-    };
+    // Create or update user profile
+    createUserProfile(user);
     
-    // Load existing user data if any
-    const existingUsers = JSON.parse(localStorage.getItem("bs_users") || "{}");
-    if (!existingUsers[user.email]) {
-      existingUsers[user.email] = userProfile;
-      localStorage.setItem("bs_users", JSON.stringify(existingUsers));
-    } else {
-      // Update existing user but preserve their stats
-      existingUsers[user.email] = {
-        ...existingUsers[user.email],
-        name: user.name,
-        picture: user.picture,
-      };
-      localStorage.setItem("bs_users", JSON.stringify(existingUsers));
-    }
-    
-    persistAuth({ role: isAdmin ? "admin" : "customer", ...user });
-    setAuth({ role: isAdmin ? "admin" : "customer", ...user });
-  };
-
-  // ... rest stays the same
-}
-
-
-  const handleGoogle = (user) => {
-    const isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
     const a = { role: isAdmin ? "admin" : "customer", ...user };
     persistAuth(a);
     setAuth(a);
@@ -1788,9 +2049,9 @@ export default function App() {
     setAuth(null);
   };
 
-  const handlePlaceOrder     = (o)    => saveOrders([o, ...orders]);
-  const handleUpdateStatus   = (id, s) => saveOrders(orders.map(o => o.id === id ? {...o, status: s} : o));
-  const handleClearCompleted = ()     => saveOrders(orders.filter(o => o.status !== "Ready"));
+  const handlePlaceOrder = (o) => saveOrders([o, ...orders]);
+  const handleUpdateStatus = (id, s) => saveOrders(orders.map(o => o.id === id ? {...o, status: s} : o));
+  const handleClearCompleted = () => saveOrders(orders.filter(o => o.status !== "Ready"));
 
   const isAdmin = auth?.role === "admin";
 
@@ -1798,7 +2059,7 @@ export default function App() {
     <>
       <style>{css}</style>
 
-      {!auth && <AuthScreen onGuest={handleGuest} onGoogle={handleGoogle}/>}
+      {!auth && <AuthScreen onGoogle={handleGoogle}/>}
 
       {auth && (
         <div style={{minHeight:"100vh", background:"var(--bg)"}}>
@@ -1814,19 +2075,19 @@ export default function App() {
                   <img className="nav-avatar" src={auth.picture} alt={auth.name} referrerPolicy="no-referrer"/>
                   <span className="nav-name">{auth.name}</span>
                 </div>
-              ) : auth.name && auth.name !== "Guest" ? (
+              ) : (
                 <div className="nav-user">
-                  <div className="nav-avatar-init">{auth.name[0]}</div>
+                  <div className="nav-avatar-init">{auth.name?.[0]}</div>
                   <span className="nav-name">{auth.name}</span>
                 </div>
-              ) : null}
+              )}
               <button className="nav-signout" onClick={handleSignOut}>Sign out</button>
             </div>
           </nav>
 
           {isAdmin
             ? <AdminView orders={orders} ratings={ratings} onUpdateStatus={handleUpdateStatus} onClearCompleted={handleClearCompleted}/>
-            : <CustomerView orders={orders} ratings={ratings} onPlaceOrder={handlePlaceOrder}/>
+            : <CustomerView orders={orders} ratings={ratings} onPlaceOrder={handlePlaceOrder} user={auth}/>
           }
         </div>
       )}

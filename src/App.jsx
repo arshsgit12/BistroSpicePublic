@@ -51,35 +51,6 @@ function useTheme() {
   return useContext(ThemeContext);
 }
 
-// ─── FIREBASE CONTEXT (Optional) ─────────────────────────────────────────────
-const FirebaseContext = createContext();
-
-function FirebaseProvider({ children }) {
-  const [db, setDb] = useState(null);
-  const [ready, setReady] = useState(!IS_FIREBASE_CONFIGURED);
-
-  useEffect(() => {
-    if (!IS_FIREBASE_CONFIGURED) return;
-    import("firebase/app").then(() => {
-      import("firebase/firestore").then(() => {
-        if (!window.firebase.apps.length) window.firebase.initializeApp(FIREBASE_CONFIG);
-        setDb(window.firebase.firestore());
-        setReady(true);
-      });
-    }).catch(() => setReady(true));
-  }, []);
-
-  return (
-    <FirebaseContext.Provider value={{ db, ready, isConfigured: IS_FIREBASE_CONFIGURED }}>
-      {children}
-    </FirebaseContext.Provider>
-  );
-}
-
-function useFirebase() {
-  return useContext(FirebaseContext);
-}
-
 // ─── UTILITY FUNCTIONS ───────────────────────────────────────────────────────
 function genId() { return "ORD-" + Math.random().toString(36).slice(2,6).toUpperCase(); }
 

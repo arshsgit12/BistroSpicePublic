@@ -1,7 +1,8 @@
 cd bistrospice
 git add .
 git commit -m "updated navbar design"
-git push
+
+
 cd ..
 git add .
 git commit -m "updated submodule"

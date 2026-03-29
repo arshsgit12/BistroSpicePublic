@@ -1,16 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 
-// ─── FIREBASE CONFIGURATION (Optional - app works without it) ─────────────────
-const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-const IS_FIREBASE_CONFIGURED = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
-
 // ─── APP CONSTANTS ───────────────────────────────────────────────────────────
 const GOOGLE_CLIENT_ID = "1031994809087-ribigpmso5umf5bt4f1eofdj4vor2rk4.apps.googleusercontent.com";
 const ADMIN_EMAILS = ["thestdychannelonly@gmail.com", "pythonwitharsh@gmail.com"];

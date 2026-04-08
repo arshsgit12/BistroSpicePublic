@@ -1,0 +1,6 @@
+{
+  "framework": "vite",
+  "installCommand": "npm install --prefix bistrospice",
+  "buildCommand": "npm run build --prefix bistrospice",
+  "outputDirectory": "bistrospice/dist"
+}

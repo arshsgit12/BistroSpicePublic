@@ -1979,7 +1979,7 @@ function AdminView({ orders, ratings, onUpdateStatus, onClearCompleted }) {
 }
 
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
-export default function App() {
+function AppShell() {
   const [auth,    setAuth]    = useState(() => loadAuth());
   const [orders,  setOrders]  = useState([]);
   const [ratings, setRatings] = useState({});
@@ -2052,5 +2052,13 @@ export default function App() {
         </div>
       )}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppShell />
+    </ThemeProvider>
   );
 }
